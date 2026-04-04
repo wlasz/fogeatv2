@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { storage, supabase } from './lib/storage.js';
+import { storage } from './lib/storage.js';
+import { supabase } from './lib/supabase.js';
 
 const V=[
 {id:1,n:"Cuprum",c:"Ресторан",s:"Европейская",a:"ул. Коцоева, 75",i:"🏛️",r:4.5,rc:197,ig:"cuprum_restaurant",lat:43.0268,lng:44.6744},
@@ -1594,20 +1595,22 @@ html,body,#root{height:100%;overflow:hidden}
                   onChange={async e=>{
                     const files=Array.from(e.target.files);
                     if(!files.length)return;
-                    
                     const now=new Date();
                     const newPhotos=[];
                     for(const file of files){
                       const path=`${sv.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
                       const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
-                      if(!error){
-                        const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
-                        newPhotos.push({src:data.publicUrl,path,date:now.toLocaleDateString("ru-RU"),time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`});
-                      }
+                      if(error){alert(`Ошибка загрузки: ${error.message}`);continue;}
+                      const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
+                      newPhotos.push({src:data.publicUrl,path,date:now.toLocaleDateString("ru-RU"),time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`});
                     }
-                    const existing=menuPhotos[sv.id]||[];
-                    const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
-                    setMenuPhotos(updated);saveMenuPhotos(updated);
+                    if(newPhotos.length){
+                      const existing=menuPhotos[sv.id]||[];
+                      const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
+                      setMenuPhotos(updated);saveMenuPhotos(updated);
+                    } else if(!files.every((_,i)=>i===0)){
+                      alert('Ни одно фото не загрузилось');
+                    }
                   }}/>
                 <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"var(--txt3)",fontSize:12,transition:"all .2s"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)"}}
