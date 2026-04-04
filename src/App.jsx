@@ -197,6 +197,7 @@ export default function FogEat(){
   const[selectedVenueForCheckin,setSelectedVenueForCheckin]=useState(null);
   const[menuPhotos,setMenuPhotos]=useState({});
   const[showMenuModal,setShowMenuModal]=useState(false);
+  const[photoViewer,setPhotoViewer]=useState(null); // {photos:[], index:0}
   const[checkinPhotos,setCheckinPhotos]=useState({});
   const[venueNotes,setVenueNotes]=useState({});
   const[customLabels,setCustomLabels]=useState([]);   // [{id,name,emoji,color}]
@@ -1390,9 +1391,11 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="sec-hdr">📋 Меню заведения <span style={{color:"var(--txt3)",fontWeight:400,fontSize:10}}>{menuPhotos[sv.id].length} фото</span></div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"4px 14px 12px"}}>
                     {menuPhotos[sv.id].map((p,i)=>(
-                      <div key={i} style={{width:96,height:96,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)"}}>
+                      <div key={i} style={{width:96,height:96,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)",cursor:"pointer"}}
+                        onClick={()=>setPhotoViewer({photos:menuPhotos[sv.id],index:i})}>
                         <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                        <button onClick={async()=>{
+                        <button onClick={async e=>{
+                          e.stopPropagation();
                           const photo=menuPhotos[sv.id][i];
                           if(photo.path){await supabase.storage.from('menu-photos').remove([photo.path]);}
                           const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
@@ -1806,6 +1809,35 @@ html,body,#root{height:100%;overflow:hidden}
                 setGeoSearch("");
               }}>Отмена</button>
           </div>
+        </div>
+      </div>
+    )}
+
+    {/* PHOTO VIEWER */}
+    {photoViewer&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.96)",zIndex:3000,display:"flex",flexDirection:"column"}}
+        onClick={()=>setPhotoViewer(null)}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",flexShrink:0}}>
+          <span style={{color:"#999",fontSize:12}}>{photoViewer.index+1} / {photoViewer.photos.length}</span>
+          <button onClick={()=>setPhotoViewer(null)} style={{background:"none",border:"none",color:"#fff",fontSize:24,cursor:"pointer",padding:"4px 8px"}}>✕</button>
+        </div>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}} onClick={e=>e.stopPropagation()}>
+          <img src={photoViewer.photos[photoViewer.index].src} alt=""
+            style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}}/>
+          {photoViewer.photos.length>1&&<>
+            <button onClick={()=>setPhotoViewer(v=>({...v,index:(v.index-1+v.photos.length)%v.photos.length}))}
+              style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:24,width:44,height:44,borderRadius:"50%",cursor:"pointer"}}>‹</button>
+            <button onClick={()=>setPhotoViewer(v=>({...v,index:(v.index+1)%v.photos.length}))}
+              style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:24,width:44,height:44,borderRadius:"50%",cursor:"pointer"}}>›</button>
+          </>}
+        </div>
+        <div style={{display:"flex",gap:6,padding:"12px 16px",overflowX:"auto",flexShrink:0}}>
+          {photoViewer.photos.map((p,i)=>(
+            <div key={i} onClick={e=>{e.stopPropagation();setPhotoViewer(v=>({...v,index:i}));}}
+              style={{width:52,height:52,borderRadius:6,overflow:"hidden",flexShrink:0,opacity:i===photoViewer.index?1:.5,border:i===photoViewer.index?"2px solid #fff":"2px solid transparent",cursor:"pointer"}}>
+              <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            </div>
+          ))}
         </div>
       </div>
     )}
