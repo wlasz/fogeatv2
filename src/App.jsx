@@ -539,13 +539,13 @@ html,body,#root{height:100%;overflow:hidden}
 .app{display:flex;flex-direction:column;height:100vh;background:var(--bg);font-family:'Nunito',sans-serif;color:var(--txt);overflow:hidden}
 
 /* MOBILE */
-.mob-map{position:fixed;inset:0;z-index:0}
-.mob-hdr{position:fixed;top:0;left:0;right:0;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:500;flex-shrink:0}
-.mob-tabs{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:500;height:calc(56px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px)}
+.mob-map{position:fixed;top:0;left:0;right:0;bottom:0;z-index:0}
+.mob-hdr{position:fixed;top:0;left:0;right:0;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:500}
+.mob-tabs{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:500;padding-bottom:env(safe-area-inset-bottom,16px)}
 .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:800;color:var(--txt3);border:none;background:none;cursor:pointer;font-family:'Nunito';padding:6px 0}
 .mob-tab.a{color:var(--gold)}
 .mob-tab .ico{font-size:18px}
-.mob-sheet{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:75vh}
+.mob-sheet{position:fixed;left:0;right:0;bottom:0;padding-bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:75vh}
 .mob-sheet-handle{width:36px;height:4px;background:var(--txt3);border-radius:2px;margin:10px auto 6px;flex-shrink:0;cursor:pointer;opacity:.6}
 .mob-vp{position:fixed;inset:0;bottom:56px;background:var(--bg2);z-index:600;overflow-y:auto;animation:slideUp .25s ease}
 @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -884,7 +884,7 @@ html,body,#root{height:100%;overflow:hidden}
 
         {/* Нижняя шторка со списком/вишлистом/чекинами/профилем */}
         {!sv&&(
-          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - 60px))"}}>
+          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - calc(56px + env(safe-area-inset-bottom,16px) + 44px)))"}}>
             <div className="mob-sheet-handle" onClick={()=>setSheetOpen(o=>!o)}/>
             {/* Мини-табы внутри шторки */}
             <div style={{display:"flex",borderBottom:"1px solid var(--border)",flexShrink:0}}>
