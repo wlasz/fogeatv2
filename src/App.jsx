@@ -779,7 +779,18 @@ html,body,#root{height:100%;overflow:hidden}
           const wished=wishVenues.find(w=>w.id===sv.id);
           const myci=checkins.filter(c=>c.venueId===sv.id);
           return(
-            <div className="mob-vp">
+            <div className="mob-vp"
+              onTouchStart={e=>{e.currentTarget._sx=e.touches[0].clientX;e.currentTarget._sy=e.touches[0].clientY;e.currentTarget._moved=false;}}
+              onTouchMove={e=>{
+                const dx=e.touches[0].clientX-e.currentTarget._sx;
+                const dy=Math.abs(e.touches[0].clientY-e.currentTarget._sy);
+                if(dx>10&&dy<60)e.currentTarget._moved=true;
+              }}
+              onTouchEnd={e=>{
+                const dx=e.changedTouches[0].clientX-e.currentTarget._sx;
+                if(e.currentTarget._moved&&dx>80)setSv(null);
+              }}
+            >
               <div style={{position:"sticky",top:0,background:"var(--bg2)",zIndex:10,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 8px",borderBottom:"1px solid var(--border)"}}>
                 <div style={{fontFamily:"'Dela Gothic One'",fontSize:16}}>{sv.n}</div>
                 <button onClick={()=>setSv(null)} style={{width:30,height:30,borderRadius:"50%",background:"var(--bg3)",border:"1px solid var(--border)",color:"var(--txt2)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -898,7 +909,7 @@ html,body,#root{height:100%;overflow:hidden}
                 const onMove=ev=>{
                   moved=true;
                   const dy=startY-ev.touches[0].clientY;
-                  const newH=Math.min(85,Math.max(20,startH+dy/window.innerHeight*100));
+                  const newH=Math.min(72,Math.max(20,startH+dy/window.innerHeight*100));
                   setSheetHeight(newH);
                   if(!sheetOpen)setSheetOpen(true);
                 };
