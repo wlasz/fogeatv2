@@ -165,7 +165,7 @@ export default function FogEat(){
   const[fontsReady,setFontsReady]=useState(false);
   const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
   const[sheetOpen,setSheetOpen]=useState(true);
-  const[sheetHeight,setSheetHeight]=useState(55);
+  const[confirmDeleteCheckin,setConfirmDeleteCheckin]=useState(null);
   const sheetDragRef=useRef(null);
   const sheetElRef=useRef(null);
   useEffect(()=>{
@@ -198,7 +198,7 @@ export default function FogEat(){
   const[selectedVenueForCheckin,setSelectedVenueForCheckin]=useState(null);
   const[menuPhotos,setMenuPhotos]=useState({});
   const[showMenuModal,setShowMenuModal]=useState(false);
-  const[photoViewer,setPhotoViewer]=useState(null); // {photos:[], index:0}
+  const[confirmDeleteCheckin,setConfirmDeleteCheckin]=useState(null);
   const[checkinPhotos,setCheckinPhotos]=useState({});
   const[venueNotes,setVenueNotes]=useState({});
   const[customLabels,setCustomLabels]=useState([]);   // [{id,name,emoji,color}]
@@ -901,8 +901,17 @@ html,body,#root{height:100%;overflow:hidden}
                     <div className="ci-top"><span className="ci-dish">{c.dish||"Чекин"}</span><span className="ci-date">{c.date} {c.time}</span></div>
                     {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>★ {c.rating}</div>}
                     {c.review&&<div className="ci-review">«{c.review}»</div>}
-                    <button onClick={async()=>{if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});}}
-                      style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
+                    {confirmDeleteCheckin===c.id?(
+                      <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
+                          style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
+                        <button onClick={()=>setConfirmDeleteCheckin(null)}
+                          style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
+                      </div>
+                    ):(
+                      <button onClick={()=>setConfirmDeleteCheckin(c.id)}
+                        style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
+                    )}
                   </div>
                 ))}
               </>}
@@ -1018,8 +1027,17 @@ html,body,#root{height:100%;overflow:hidden}
                       </div>
                       {c.review&&<div className="ck-review">«{c.review}»</div>}
                     </div>
-                    <button onClick={async()=>{if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);}}
-                      style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                    {confirmDeleteCheckin===c.id?(
+                      <div style={{display:"flex",gap:4,flexShrink:0}}>
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setConfirmDeleteCheckin(null);}}
+                          style={{width:40,height:20,borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,cursor:"pointer"}}>да</button>
+                        <button onClick={()=>setConfirmDeleteCheckin(null)}
+                          style={{width:40,height:20,borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,cursor:"pointer"}}>нет</button>
+                      </div>
+                    ):(
+                      <button onClick={()=>setConfirmDeleteCheckin(c.id)}
+                        style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1442,12 +1460,22 @@ html,body,#root{height:100%;overflow:hidden}
                       {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>★ {c.rating}</div>}
                       {c.price&&<div style={{fontSize:10,color:"var(--txt3)"}}>{c.price}₽</div>}
                       {c.review&&<div className="ci-review">«{c.review}»</div>}
-                      <button onClick={async()=>{
-                        if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
-                        const updated=checkins.filter(ch=>ch.id!==c.id);
-                        setCheckins(updated);saveCheckins(updated);
-                        setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
-                      }} style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
+                      {confirmDeleteCheckin===c.id?(
+                        <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
+                          <button onClick={async()=>{
+                            if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
+                            const updated=checkins.filter(ch=>ch.id!==c.id);
+                            setCheckins(updated);saveCheckins(updated);
+                            setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
+                            setConfirmDeleteCheckin(null);
+                          }} style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
+                          <button onClick={()=>setConfirmDeleteCheckin(null)}
+                            style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
+                        </div>
+                      ):(
+                        <button onClick={()=>setConfirmDeleteCheckin(c.id)}
+                          style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
+                      )}
                     </div>
                   ))}
                 </>}
