@@ -1589,31 +1589,30 @@ html,body,#root{height:100%;overflow:hidden}
             </div>
             <div className="md-body">
               <label style={{display:"block",cursor:"pointer",marginBottom:10}}>
-                <input type="file" accept="image/*" style={{display:"none"}}
+                <input type="file" accept="image/*" multiple style={{display:"none"}}
                   onChange={async e=>{
-                    const file=e.target.files[0];
-                    if(!file)return;
+                    const files=Array.from(e.target.files);
+                    if(!files.length)return;
                     const {supabase}=await import('./lib/storage.js');
                     const now=new Date();
-                    const path=`${sv.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
-                    const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
-                    if(error){alert('Ошибка загрузки фото');return;}
-                    const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
-                    const photo={
-                      src:data.publicUrl,
-                      path,
-                      date:now.toLocaleDateString("ru-RU"),
-                      time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
-                    };
+                    const newPhotos=[];
+                    for(const file of files){
+                      const path=`${sv.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+                      const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
+                      if(!error){
+                        const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
+                        newPhotos.push({src:data.publicUrl,path,date:now.toLocaleDateString("ru-RU"),time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`});
+                      }
+                    }
                     const existing=menuPhotos[sv.id]||[];
-                    const updated={...menuPhotos,[sv.id]:[...existing,photo]};
+                    const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
                     setMenuPhotos(updated);saveMenuPhotos(updated);
                   }}/>
                 <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"var(--txt3)",fontSize:12,transition:"all .2s"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)"}}
                   onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.color="var(--txt3)"}}>
                   <span style={{fontSize:30}}>📷</span>
-                  <span>Добавить фото меню</span>
+                  <span>Добавить фото (можно несколько)</span>
                 </div>
               </label>
               {menuPhotos[sv.id]?.length>0&&<>
