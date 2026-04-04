@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
-import { storage } from './lib/storage.js'
-
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const V=[
 {id:1,n:"Cuprum",c:"Ресторан",s:"Европейская",a:"ул. Коцоева, 75",i:"🏛️",r:4.5,rc:197,ig:"cuprum_restaurant",lat:43.0268,lng:44.6744},
@@ -162,6 +160,14 @@ const INIT_USER={name:"Wlasz",level:1,title:"Новичок",xp:0,nxp:200,venues
 export default function FogEat(){
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
+  const[fontsReady,setFontsReady]=useState(false);
+  const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
+  const[sheetOpen,setSheetOpen]=useState(true);
+  useEffect(()=>{
+    const fn=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener("resize",fn);
+    return()=>window.removeEventListener("resize",fn);
+  },[]);
   const[tab,setTab]=useState("map");
   const[mm,setMm]=useState("city");
   const[cf,setCf]=useState("all");
@@ -209,14 +215,14 @@ export default function FogEat(){
 
   // Load from storage — каждый ключ независимо
   useEffect(()=>{
-    const g=async(key)=>{try{const r=await storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}};
+    const g=async(key)=>{try{const r=await window.storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}};
     const load=async()=>{
       const checkins=await g("fogeat-checkins");if(checkins)setCheckins(checkins);
       const wv=await g("fogeat-wishvenues");if(wv)setWishVenues(wv);
       const wd=await g("fogeat-wishdishes");if(wd)setWishDishes(wd);
       const u=await g("fogeat-user");
-      if(u){if(u.checkins>0||u.xp>0){try{await storage.delete("fogeat-user");}catch(e){}}else{setUser(u);}}
-      try{await storage.delete("fogeat-achs");}catch(e){}
+      if(u){if(u.checkins>0||u.xp>0){try{await window.storage.delete("fogeat-user");}catch(e){}}else{setUser(u);}}
+      try{await window.storage.delete("fogeat-achs");}catch(e){}
       const mp=await g("fogeat-menuphotos");if(mp)setMenuPhotos(mp);
       const cv=await g("fogeat-customvenues");if(cv)setCustomVenues(cv);
       // резервный список удалённых ID
@@ -246,20 +252,20 @@ export default function FogEat(){
 
 
 
-  const saveMenuPhotos=async(data)=>{try{await storage.set("fogeat-menuphotos",JSON.stringify(data));}catch(e){}};
-  const saveVenueNotes=async(data)=>{try{await storage.set("fogeat-venuenotes",JSON.stringify(data));}catch(e){}};
-  const saveCustomLabels=async(data)=>{try{await storage.set("fogeat-customlabels",JSON.stringify(data));}catch(e){}};
-  const saveVenueLabels=async(data)=>{try{await storage.set("fogeat-venuelabels",JSON.stringify(data));}catch(e){}};
+  const saveMenuPhotos=async(data)=>{try{await window.storage.set("fogeat-menuphotos",JSON.stringify(data));}catch(e){}};
+  const saveVenueNotes=async(data)=>{try{await window.storage.set("fogeat-venuenotes",JSON.stringify(data));}catch(e){}};
+  const saveCustomLabels=async(data)=>{try{await window.storage.set("fogeat-customlabels",JSON.stringify(data));}catch(e){}};
+  const saveVenueLabels=async(data)=>{try{await window.storage.set("fogeat-venuelabels",JSON.stringify(data));}catch(e){}};
 
-  const saveCheckins=async(data)=>{try{await storage.set("fogeat-checkins",JSON.stringify(data));}catch(e){}};
-  const saveWishVenues=async(data)=>{try{await storage.set("fogeat-wishvenues",JSON.stringify(data));}catch(e){}};
-  const saveWishDishes=async(data)=>{try{await storage.set("fogeat-wishdishes",JSON.stringify(data));}catch(e){}};
-  const saveUser=async(data)=>{try{await storage.set("fogeat-user",JSON.stringify(data));}catch(e){}};
+  const saveCheckins=async(data)=>{try{await window.storage.set("fogeat-checkins",JSON.stringify(data));}catch(e){}};
+  const saveWishVenues=async(data)=>{try{await window.storage.set("fogeat-wishvenues",JSON.stringify(data));}catch(e){}};
+  const saveWishDishes=async(data)=>{try{await window.storage.set("fogeat-wishdishes",JSON.stringify(data));}catch(e){}};
+  const saveUser=async(data)=>{try{await window.storage.set("fogeat-user",JSON.stringify(data));}catch(e){}};
   const saveCustomVenues=async(data)=>{
-    try{await storage.set("fogeat-customvenues",JSON.stringify(data));}catch(e){}
+    try{await window.storage.set("fogeat-customvenues",JSON.stringify(data));}catch(e){}
     // дополнительно сохраняем список удалённых ID отдельно
     const delIds=data.filter(v=>v.deleted).map(v=>v.id);
-    try{await storage.set("fogeat-deleted",JSON.stringify(delIds));}catch(e){}
+    try{await window.storage.set("fogeat-deleted",JSON.stringify(delIds));}catch(e){}
   };
 
   // загружаем фото чекинов когда открывается панель заведения
@@ -269,7 +275,7 @@ export default function FogEat(){
       const myci=checkins.filter(c=>c.venueId===sv.id&&c.photoKey);
       const photos={};
       for(const c of myci){
-        try{const r=await storage.get(c.photoKey);if(r)photos[c.id]=r.value;}catch(e){}
+        try{const r=await window.storage.get(c.photoKey);if(r)photos[c.id]=r.value;}catch(e){}
       }
       setCheckinPhotos(p=>({...p,...photos}));
     };
@@ -281,6 +287,8 @@ export default function FogEat(){
       const l=document.createElement("link");l.rel="stylesheet";l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";document.head.appendChild(l);
       const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";s.onload=()=>setLr(true);document.head.appendChild(s);
     }else{setLr(true);}
+    // ждём шрифты
+    document.fonts.ready.then(()=>setFontsReady(true));
   },[]);
 
   useEffect(()=>{
@@ -412,7 +420,7 @@ export default function FogEat(){
     let photoKey=null;
     if(checkinPhoto){
       photoKey=`fogeat-photo-${id}`;
-      try{await storage.set(photoKey,checkinPhoto);}catch(e){}
+      try{await window.storage.set(photoKey,checkinPhoto);}catch(e){}
     }
     const newCheckin={
       id,venueId:venue.id,venueName:venue.n,
@@ -515,7 +523,8 @@ export default function FogEat(){
 
   return(<>
     <style>{`
-@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Nunito:wght@400;600;700;800;900&display=swap');
+@keyframes splashFade{0%{opacity:1;pointer-events:all}80%{opacity:1}100%{opacity:0;pointer-events:none}}
+@keyframes splashPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
 :root{
   --bg:#090c08;--bg2:#0f1410;--bg3:#1a201a;--card:#141a14;
   --gold:#e8a838;--gold2:#ffc857;--gold3:#fff0c0;
@@ -526,6 +535,18 @@ export default function FogEat(){
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#root{height:100%;overflow:hidden}
 .app{display:flex;flex-direction:column;height:100vh;background:var(--bg);font-family:'Nunito',sans-serif;color:var(--txt);overflow:hidden}
+
+/* MOBILE */
+.mob-map{position:fixed;inset:0;z-index:0}
+.mob-hdr{position:fixed;top:0;left:0;right:0;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:500;flex-shrink:0}
+.mob-tabs{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:500;padding-bottom:env(safe-area-inset-bottom,0px)}
+.mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:800;color:var(--txt3);border:none;background:none;cursor:pointer;font-family:'Nunito';padding:6px 0}
+.mob-tab.a{color:var(--gold)}
+.mob-tab .ico{font-size:18px}
+.mob-sheet{position:fixed;left:0;right:0;bottom:56px;background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:75vh}
+.mob-sheet-handle{width:36px;height:4px;background:var(--txt3);border-radius:2px;margin:10px auto 6px;flex-shrink:0;cursor:pointer;opacity:.6}
+.mob-vp{position:fixed;inset:0;bottom:56px;background:var(--bg2);z-index:600;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* HEADER */
 .hdr{display:flex;align-items:center;padding:0 14px;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);gap:10px;z-index:20;flex-shrink:0}
@@ -708,20 +729,271 @@ html,body,#root{height:100%;overflow:hidden}
 .success-xp{font-family:'Dela Gothic One';font-size:36px;color:var(--gold);margin:8px 0}
 `}</style>
 
-    <div className="app">
+    {!fontsReady&&(
+      <div style={{position:"fixed",inset:0,background:"#090c08",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+        <div style={{fontFamily:"'Dela Gothic One',sans-serif",fontSize:42,letterSpacing:4,color:"#7fd458",animation:"splashPulse 1.6s ease-in-out infinite"}}>
+          FOG<span style={{color:"#e8a838"}}>EAT</span>
+        </div>
+        <div style={{fontSize:12,color:"#5a5648",fontFamily:"sans-serif",letterSpacing:2}}>Владикавказ</div>
+      </div>
+    )}
+    <div className="app" style={{opacity:fontsReady?1:0,transition:"opacity .4s"}}>
 
       {sr&&(
         <div className="success-overlay">
           <div className="success-card">
             <div style={{fontSize:54}}>{srType==="checkin"?"🎉":"✅"}</div>
             <div className="success-xp">{srType==="checkin"?"+50 XP":"+20 XP"}</div>
-            <div style={{fontSize:13,color:"var(--txt2)"}}>{srType==="checkin"?"Чекин сохранён!":"Посещение отмечено!"}</div>
-            {srType==="checkin"&&<div style={{fontSize:11,color:"var(--grn3)",marginTop:6}}>🔥 Стрик: 6 дней!</div>}
+            <div style={{fontSize:13,color:"var(--txt2)",fontFamily:"'Nunito',sans-serif"}}>{srType==="checkin"?"Чекин сохранён!":"Посещение отмечено!"}</div>
           </div>
         </div>
       )}
 
-      {/* HEADER */}
+    {isMobile ? (
+      /* ===== МОБИЛЬНЫЙ LAYOUT ===== */
+      <>
+        {/* Карта на весь экран */}
+        <div className="mob-map">
+          <div id="mapEl" ref={mapRef} style={{width:"100%",height:"100%"}}/>
+          <button className="fab" onClick={()=>setShowAddVenue(true)}>+</button>
+        </div>
+
+        {/* Хедер */}
+        <div className="mob-hdr">
+          <div className="logo" style={{fontSize:16}}>FOG<span>EAT</span></div>
+          <div className="hmode" style={{transform:"scale(.85)",transformOrigin:"left"}}>
+            <button className={mm==="city"?"a":""} onClick={()=>setMm("city")}>🌍 Город</button>
+            <button className={mm==="my"?"a":""} onClick={()=>setMm("my")}>👤 Моя</button>
+          </div>
+          <div style={{marginLeft:"auto",fontSize:10,color:"var(--txt3)",fontWeight:700}}>{visitedIds.size}/{allVenues.length}</div>
+        </div>
+
+        {/* Панель заведения — полноэкранная шторка */}
+        {sv&&allVenues.find(v=>v.id===sv.id)&&(()=>{
+          const visited=visitedIds.has(String(sv.id));
+          const col=VENUE_COLOR(visited);
+          const wished=wishVenues.find(w=>w.id===sv.id);
+          const myci=checkins.filter(c=>c.venueId===sv.id);
+          return(
+            <div className="mob-vp">
+              <div style={{position:"sticky",top:0,background:"var(--bg2)",zIndex:10,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 8px",borderBottom:"1px solid var(--border)"}}>
+                <div style={{fontFamily:"'Dela Gothic One'",fontSize:16}}>{sv.n}</div>
+                <button onClick={()=>setSv(null)} style={{width:30,height:30,borderRadius:"50%",background:"var(--bg3)",border:"1px solid var(--border)",color:"var(--txt2)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+              </div>
+              <div style={{padding:"12px 16px 6px"}}>
+                <div style={{fontSize:12,color:"var(--txt3)",marginBottom:8}}>📍 {sv.a}</div>
+                <div className="vp-tags">
+                  {mm==="city"&&sv.r>0&&<span className="vp-tag gold">★ {sv.r} · {sv.rc} отз.</span>}
+                  {mm==="my"&&(()=>{
+                    const myRatings=myci.filter(c=>c.rating>0);
+                    if(!myRatings.length)return null;
+                    const avg=(myRatings.reduce((s,c)=>s+c.rating,0)/myRatings.length).toFixed(1);
+                    return <span className="vp-tag gold">★ {avg} · моя оценка</span>;
+                  })()}
+                  <span className="vp-tag">{sv.c}</span>
+                  {sv.s&&<span className="vp-tag">{sv.s}</span>}
+                  {visited&&<span className="vp-tag grn">✓ Был</span>}
+                </div>
+              </div>
+              <div className="vp-actions">
+                <button className="btn-primary" onClick={()=>{setSelectedVenueForCheckin(sv);setSc(true)}}>📸 Чекин</button>
+                <button className={`btn-outline ${wished?"active":""}`} onClick={()=>wished?removeWishVenue(sv.id):addWishVenue(sv)}>
+                  {wished?"📌 Вишлист":"📌 Хочу"}
+                </button>
+              </div>
+              {sv.ig&&(
+                <div style={{padding:"0 14px 10px"}}>
+                  <div onClick={()=>{const a=document.createElement("a");a.href=`https://instagram.com/${sv.ig}`;a.target="_blank";a.rel="noreferrer";document.body.appendChild(a);a.click();document.body.removeChild(a);}}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,background:"rgba(192,80,240,.1)",border:"1px solid rgba(192,80,240,.25)",color:"#c080f0",cursor:"pointer"}}>
+                    <span style={{fontSize:18}}>📷</span>
+                    <div><div style={{fontSize:12,fontWeight:800,fontFamily:"'Nunito'"}}>@{sv.ig}</div><div style={{fontSize:9,color:"rgba(192,80,240,.7)"}}>Instagram</div></div>
+                    <span style={{marginLeft:"auto"}}>→</span>
+                  </div>
+                </div>
+              )}
+              {customLabels.length>0&&(
+                <div style={{padding:"0 14px 10px"}}>
+                  <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:6,textTransform:"uppercase"}}>🏷️ Теги</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {customLabels.map(l=>{
+                      const has=(venueLabels[String(sv.id)]||[]).includes(l.id);
+                      return(
+                        <button key={l.id} style={{padding:"4px 10px",borderRadius:12,border:`1.5px solid ${has?l.color:"var(--border)"}`,background:has?`${l.color}22`:"transparent",color:has?l.color:"var(--txt3)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito'"}}
+                          onClick={()=>{const cur=venueLabels[String(sv.id)]||[];const updated={...venueLabels,[String(sv.id)]:has?cur.filter(x=>x!==l.id):[...cur,l.id]};setVenueLabels(updated);saveVenueLabels(updated);}}>
+                          {l.emoji} {l.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div style={{padding:"0 14px 10px"}}>
+                <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:5,textTransform:"uppercase"}}>📝 Заметка</div>
+                <textarea value={venueNotes[sv.id]||""} onChange={e=>{const u={...venueNotes,[sv.id]:e.target.value};setVenueNotes(u);saveVenueNotes(u);}}
+                  placeholder="Общее впечатление..." rows={3}
+                  style={{width:"100%",padding:"9px 11px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:10,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none",resize:"none"}}/>
+              </div>
+              <div style={{padding:"0 14px 8px"}}>
+                <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid var(--grn2)",background:"rgba(90,156,53,.12)",color:"var(--grn3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                  onClick={()=>setShowVisitModal(true)}>{visited?"✓ Отметить ещё":"✓ Отметить посещение"}</button>
+              </div>
+              <div style={{padding:"0 14px 8px"}}>
+                <button className="btn-outline" style={{width:"100%"}} onClick={()=>setShowMenuModal(true)}>
+                  📋 {menuPhotos[sv.id]?.length>0?`Меню (${menuPhotos[sv.id].length} фото)`:"Добавить меню"}
+                </button>
+              </div>
+              <div style={{padding:"0 14px 12px"}}>
+                {sv._confirmDelete?(
+                  <div style={{borderRadius:10,border:"1.5px solid rgba(200,50,50,.5)",background:"rgba(200,50,50,.1)",padding:"10px 12px"}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#d06060",marginBottom:8,textAlign:"center"}}>Удалить «{sv.n}»?</div>
+                    <div style={{display:"flex",gap:6}}>
+                      <button style={{flex:1,padding:8,borderRadius:8,border:"none",background:"#c03030",color:"#fff",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                        onClick={()=>{
+                          if(sv.custom){const u=customVenues.filter(v=>v.id!==sv.id);setCustomVenues(u);saveCustomVenues(u);}
+                          else{const tombstone={id:sv.id,deleted:true};const u=[...customVenues.filter(v=>v.id!==sv.id),tombstone];setCustomVenues(u);saveCustomVenues(u);}
+                          setSv(null);
+                        }}>Удалить</button>
+                      <button style={{flex:1,padding:8,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                        onClick={()=>setSv(v=>({...v,_confirmDelete:false}))}>Отмена</button>
+                    </div>
+                  </div>
+                ):(
+                  <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                    onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>🗑 Удалить заведение</button>
+                )}
+              </div>
+              {myci.length>0&&<>
+                <div className="sec-hdr">📸 Мои чекины <span style={{color:"var(--txt3)",fontWeight:400,fontSize:10}}>{myci.length}</span></div>
+                {myci.map((c,i)=>(
+                  <div key={i} className="ci" style={{position:"relative"}}>
+                    {checkinPhotos[c.id]&&<img src={checkinPhotos[c.id]} alt="" style={{width:"100%",height:120,objectFit:"cover",borderRadius:8,marginBottom:6}}/>}
+                    <div className="ci-top"><span className="ci-dish">{c.dish||"Чекин"}</span><span className="ci-date">{c.date} {c.time}</span></div>
+                    {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>★ {c.rating}</div>}
+                    {c.review&&<div className="ci-review">«{c.review}»</div>}
+                    <button onClick={async()=>{if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});}}
+                      style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
+                  </div>
+                ))}
+              </>}
+              <div style={{height:20}}/>
+            </div>
+          );
+        })()}
+
+        {/* Нижняя шторка со списком/вишлистом/чекинами/профилем */}
+        {!sv&&(
+          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - 60px))"}}>
+            <div className="mob-sheet-handle" onClick={()=>setSheetOpen(o=>!o)}/>
+            {/* Мини-табы внутри шторки */}
+            <div style={{display:"flex",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+              {[["map","📍","Места"],["wishlist","📌","Вишлист"],["checkins","✅","Чекины"],["profile","👤","Профиль"]].map(([k,ico,lbl])=>(
+                <button key={k} onClick={()=>setTab(k)}
+                  style={{flex:1,padding:"8px 4px",background:"none",border:"none",borderBottom:`2px solid ${tab===k?"var(--gold)":"transparent"}`,color:tab===k?"var(--gold)":"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:9,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                  <span style={{fontSize:15}}>{ico}</span>{lbl}
+                </button>
+              ))}
+            </div>
+
+            {tab==="map"&&(
+              <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
+                <div style={{padding:"8px 10px 4px",position:"relative"}}>
+                  <span style={{position:"absolute",left:18,top:"50%",transform:"translateY(-50%)",fontSize:13}}>🔍</span>
+                  <input className="srch" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:30}}/>
+                </div>
+                <div className="chips" onMouseDown={e=>{const el=e.currentTarget;el.classList.add("dragging");const sx=e.pageX-el.offsetLeft,sl=el.scrollLeft;const mv=ev=>{el.scrollLeft=sl-(ev.pageX-el.offsetLeft-sx);};const up=()=>{el.classList.remove("dragging");window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}>
+                  {CATS.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
+                  {customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
+                  <button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>
+                </div>
+                <div style={{padding:"2px 12px 4px",fontSize:9,color:"var(--txt3)",fontWeight:700,display:"flex",justifyContent:"space-between"}}>
+                  <span>{fl.length} заведений</span>
+                  <button onClick={()=>setShowAddVenue(true)} style={{padding:"2px 8px",borderRadius:6,background:"var(--grn)",color:"#fff",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>+ Добавить</button>
+                </div>
+                <div className="sc">
+                  {fl.map(v=>{
+                    const visited=visitedIds.has(String(v.id));
+                    const col=VENUE_COLOR(visited);
+                    return(
+                      <div key={v.id} className="vi" onClick={()=>{setSv(v);mapInst.current?.flyTo([v.lat,v.lng],16,{duration:.5})}}>
+                        <div className="vi-strip" style={{background:col.accent}}/>
+                        <div className="vi-icon" style={{background:col.bg}}>{v.i}</div>
+                        <div className="vi-info"><div className="vi-name">{v.n}</div><div className="vi-sub">{v.a}{v.s?` · ${v.s}`:""}</div></div>
+                        <div className="vi-right">
+                          {mm==="city"&&v.r>0&&<div className="vi-rating">★ {v.r}</div>}
+                          {mm==="my"&&(()=>{const myR=checkins.filter(c=>c.venueId===v.id&&c.rating>0);if(!myR.length)return null;const avg=(myR.reduce((s,c)=>s+c.rating,0)/myR.length).toFixed(1);return<div className="vi-rating" style={{color:"var(--grn3)"}}>★ {avg}</div>;})()}
+                          {visited&&<div className="vi-visited"/>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {tab==="wishlist"&&(
+              <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
+                <div className="wl-tabs">{["venues","done"].map(k=><button key={k} className={`wl-tab ${wt===k?"a":""}`} onClick={()=>setWt(k)}>{k==="venues"?"📍 Места":"✅ Готово"}</button>)}</div>
+                <div className="sc">
+                  {wt==="venues"&&(wishVenues.length===0?<div className="empty"><div className="empty-ico">📌</div><div className="empty-txt">Нет мест</div></div>:wishVenues.map((w,i)=>(
+                    <div key={i} className="wi"><div className="wic">{w.c}</div><div className="wif"><div className="win">{w.n}</div></div><button className="wr" onClick={()=>removeWishVenue(w.id)}>×</button></div>
+                  )))}
+                  {wt==="done"&&checkins.slice(0,20).map((c,i)=>(
+                    <div key={i} className="wi" style={{opacity:.7}}><div className="wic">✅</div><div className="wif"><div className="win" style={{textDecoration:"line-through"}}>{c.venueName}</div><div className="wint">{c.date}</div></div></div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tab==="checkins"&&(
+              <div className="sc">
+                {checkins.length===0?<div className="empty"><div className="empty-ico">📸</div><div className="empty-txt">Нет чекинов</div></div>:checkins.map((c,i)=>(
+                  <div key={i} className="ck" style={{display:"flex",alignItems:"flex-start",gap:6}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div className="ck-venue">{c.venueName}</div>
+                      <div className="ck-meta">
+                        <span style={{color:"var(--gold)",fontSize:10}}>{c.rating>0?`★ ${c.rating}`:""}</span>
+                        {c.dish&&<span className="ck-dish">{c.dish}</span>}
+                        <span className="ck-date">{c.date}</span>
+                      </div>
+                      {c.review&&<div className="ck-review">«{c.review}»</div>}
+                    </div>
+                    <button onClick={async()=>{if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);}}
+                      style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tab==="profile"&&(
+              <div className="sc">
+                <div className="prof-hero">
+                  <div className="prof-av">{user.name[0]}</div>
+                  <div className="prof-name">{user.name}</div>
+                  <div className="prof-title">Lv.{user.level} · {user.title}</div>
+                  <div className="prof-xp-bar"><div className="prof-xp-fill" style={{width:`${(user.xp/user.nxp)*100}%`}}/></div>
+                  <div className="prof-xp-lbl">{user.xp} / {user.nxp} XP</div>
+                </div>
+                <div className="stats-grid">
+                  {[{n:visitedIds.size,l:"Открыто"},{n:checkins.length,l:"Чекинов"},{n:checkins.filter(c=>c.review&&c.review.trim()).length,l:"Отзывов"},{n:checkins.filter(c=>c.photoKey).length,l:"Фото"}].map((s,i)=>(
+                    <div key={i} className="stat-card"><div className="stat-n">{s.n}</div><div className="stat-l">{s.l}</div></div>
+                  ))}
+                </div>
+                <div className="sec-hdr">🏆 Достижения</div>
+                {computedAchs.map((a,i)=>(
+                  <div key={i} className="ach">
+                    <div className={`ach-icon ${a.ok?"done":""}`}>{a.i}</div>
+                    <div className="ach-info"><div className="ach-name">{a.n}</div><div className="ach-desc">{a.d}</div>{!a.ok&&<div className="ach-bar"><div className="ach-bar-fill" style={{width:`${Math.min(100,(a.p/a.t)*100)}%`}}/></div>}</div>
+                    <div className="ach-cnt">{a.ok?"✅":`${a.p}/${a.t}`}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+      </>
+    ) : (
+      <>
       <div className="hdr">
         <div className="logo">FOG<span>EAT</span></div>
         <div className="hmode">
@@ -856,14 +1128,21 @@ html,body,#root{height:100%;overflow:hidden}
                   <div style={{fontSize:10,marginTop:6,color:"var(--txt3)"}}>Нажми + на карте чтобы добавить</div>
                 </div>
               ):checkins.map((c,i)=>(
-                <div key={i} className="ck">
-                  <div className="ck-venue">{c.venueName}</div>
-                  <div className="ck-meta">
-                    <span style={{color:"var(--gold)",fontSize:10}}>{c.rating>0?("★".repeat(Math.floor(c.rating||0))+(c.rating%1?".5":"")):""}</span>
-                    {c.dish&&<span className="ck-dish">{c.dish}</span>}
-                    <span className="ck-date">{c.date}</span>
+                <div key={i} className="ck" style={{display:"flex",alignItems:"flex-start",gap:6}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="ck-venue">{c.venueName}</div>
+                    <div className="ck-meta">
+                      <span style={{color:"var(--gold)",fontSize:10}}>{c.rating>0?(`★ ${c.rating}`):""}</span>
+                      {c.dish&&<span className="ck-dish">{c.dish}</span>}
+                      <span className="ck-date">{c.date}</span>
+                    </div>
+                    {c.review&&<div className="ck-review">«{c.review}»</div>}
                   </div>
-                  {c.review&&<div className="ck-review">«{c.review}»</div>}
+                  <button onClick={async()=>{
+                    if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}
+                    const updated=checkins.filter(ch=>ch.id!==c.id);
+                    setCheckins(updated);saveCheckins(updated);
+                  }} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
                 </div>
               ))}
             </div>
@@ -1086,11 +1365,11 @@ html,body,#root{height:100%;overflow:hidden}
                         <span className="ci-dish">{c.dish||"Чекин"}</span>
                         <span className="ci-date">{c.date} {c.time}</span>
                       </div>
-                      {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>{"★".repeat(Math.floor(c.rating))}{c.rating%1?".5":""}</div>}
+                      {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>★ {c.rating}</div>}
                       {c.price&&<div style={{fontSize:10,color:"var(--txt3)"}}>{c.price}₽</div>}
                       {c.review&&<div className="ci-review">«{c.review}»</div>}
                       <button onClick={async()=>{
-                        if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}
+                        if(c.photoKey){try{await window.storage.delete(c.photoKey);}catch(e){}}
                         const updated=checkins.filter(ch=>ch.id!==c.id);
                         setCheckins(updated);saveCheckins(updated);
                         setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
@@ -1103,7 +1382,9 @@ html,body,#root{height:100%;overflow:hidden}
           })()}
         </div>
       </div>
-    </div>
+      </>
+    )} {/* конец десктопного layout */}
+    </div> {/* конец .app */}
 
     {/* CHECKIN MODAL */}
     {sc&&(
