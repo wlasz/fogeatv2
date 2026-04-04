@@ -165,8 +165,9 @@ export default function FogEat(){
   const[fontsReady,setFontsReady]=useState(false);
   const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
   const[sheetOpen,setSheetOpen]=useState(true);
-  const[sheetHeight,setSheetHeight]=useState(55); // % от высоты экрана
+  const[sheetHeight,setSheetHeight]=useState(55);
   const sheetDragRef=useRef(null);
+  const sheetElRef=useRef(null);
   useEffect(()=>{
     const fn=()=>setIsMobile(window.innerWidth<768);
     window.addEventListener("resize",fn);
@@ -912,33 +913,36 @@ html,body,#root{height:100%;overflow:hidden}
 
         {/* Нижняя шторка со списком/вишлистом/чекинами/профилем */}
         {!sv&&(
-          <div className="mob-sheet" style={{
+          <div className="mob-sheet" ref={sheetElRef} style={{
             height: sheetOpen ? `${sheetHeight}vh` : "36px",
-            transition: sheetDragRef.current ? "none" : "height .3s cubic-bezier(.4,0,.2,1)"
           }}>
             <div className="mob-sheet-handle"
               onTouchStart={e=>{
                 const startY=e.touches[0].clientY;
-                const startH=sheetHeight;
+                const startH=sheetOpen?sheetHeight:0;
                 let moved=false;
+                const el=sheetElRef.current;
+                if(el)el.style.transition="none";
                 const onMove=ev=>{
                   moved=true;
                   const dy=startY-ev.touches[0].clientY;
-                  const newH=Math.min(72,Math.max(20,startH+dy/window.innerHeight*100));
-                  setSheetHeight(newH);
-                  if(!sheetOpen)setSheetOpen(true);
+                  const newH=Math.min(72,Math.max(0,startH+dy/window.innerHeight*100));
+                  if(el)el.style.height=`${newH}vh`;
                 };
-                const onEnd=()=>{
+                const onEnd=ev=>{
                   sheetDragRef.current=false;
+                  if(el)el.style.transition="height .3s cubic-bezier(.4,0,.2,1)";
                   if(!moved){
-                    // просто тап — toggle
                     setSheetOpen(o=>{
-                      if(!o){setSheetHeight(55);}
+                      if(!o){setSheetHeight(55);if(el)el.style.height="55vh";}
+                      else{if(el)el.style.height="36px";}
                       return !o;
                     });
                   } else {
-                    // после драга — если совсем маленькая то свернуть
-                    if(sheetHeight<15)setSheetOpen(false);
+                    const dy=startY-ev.changedTouches[0].clientY;
+                    const finalH=Math.min(72,Math.max(0,startH+dy/window.innerHeight*100));
+                    if(finalH<15){setSheetOpen(false);setSheetHeight(55);if(el)el.style.height="36px";}
+                    else{setSheetOpen(true);setSheetHeight(finalH);}
                   }
                   document.removeEventListener("touchmove",onMove);
                   document.removeEventListener("touchend",onEnd);
