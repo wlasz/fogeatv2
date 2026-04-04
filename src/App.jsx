@@ -5,7 +5,7 @@ const V=[
 {id:2,n:"Dan",c:"Ресторан",s:"Итал./авторская",a:"ул. Баллаева, 16",i:"🏛️",r:4.5,rc:37,ig:"dan.restaurant",lat:43.0322,lng:44.6781},
 {id:3,n:"Deva Cafe",c:"Ресторан",s:"Гастро",a:"ул. Коцоева, 81",i:"🏛️",r:4.3,rc:13,ig:"deva__cafe",lat:43.0294,lng:44.6734},
 {id:4,n:"KoYROI",c:"Ресторан",s:"Осетинская",a:"ул. Коцоева, 26",i:"🏛️",r:4.4,rc:503,ig:"restoran_koyroi",lat:43.0224,lng:44.6782,dishes:[{id:101,nm:"Фыджин",tg:"Пироги",rt:4.8,pr:400,ph:"🫓",rv:18},{id:102,nm:"Форель на гриле",tg:"Рыба",rt:4.7,pr:650,ph:"🐟",rv:12},{id:103,nm:"Салат с грушей",tg:"Салаты",rt:4.9,pr:380,ph:"🥗",rv:8}]},
-{id:7,n:"Prato Café",c:"Ресторан",s:"Итальянская",a:"ул. Революции, 18",i:"🏛️",r:4.5,rc:32,lat:43.0285,lng:44.6838}, 
+{id:7,n:"Prato Café",c:"Ресторан",s:"Итальянская",a:"ул. Революции, 18",i:"🏛️",r:4.5,rc:32,lat:43.0285,lng:44.6838},
 {id:8,n:"Premier",c:"Ресторан",s:"Европейская",a:"ул. Пашковского, 2а",i:"🏛️",r:4.5,rc:106,ig:"premier_vld",lat:43.0319,lng:44.6724},
 {id:9,n:"Syndicate",c:"Ресторан",s:"Авторская",a:"пр. Мира, 41",i:"🏛️",r:4.4,rc:176,ig:"syndicate.vld",lat:43.0327,lng:44.6798},
 {id:10,n:"Vershina 5033",c:"Ресторан",s:"Европ./кавк.",a:"пр. Мира, 10",i:"🏛️",r:3.4,rc:60,ig:"vershina5033",lat:43.0283,lng:44.6812},
@@ -163,6 +163,8 @@ export default function FogEat(){
   const[fontsReady,setFontsReady]=useState(false);
   const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
   const[sheetOpen,setSheetOpen]=useState(true);
+  const[sheetHeight,setSheetHeight]=useState(55); // % от высоты экрана
+  const sheetDragRef=useRef(null);
   useEffect(()=>{
     const fn=()=>setIsMobile(window.innerWidth<768);
     window.addEventListener("resize",fn);
@@ -545,7 +547,7 @@ html,body,#root{height:100%;overflow:hidden}
 .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:800;color:var(--txt3);border:none;background:none;cursor:pointer;font-family:'Nunito';padding:6px 0}
 .mob-tab.a{color:var(--gold)}
 .mob-tab .ico{font-size:18px}
-.mob-sheet{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:72vh}
+.mob-sheet{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;overflow:hidden}
 .mob-sheet-handle{width:100%;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.mob-sheet-handle::after{content:"";display:block;width:36px;height:4px;background:var(--txt3);border-radius:2px;opacity:.6}
 .mob-vp{position:fixed;inset:0;bottom:56px;background:var(--bg2);z-index:600;overflow-y:auto;animation:slideUp .25s ease}
 @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
@@ -884,8 +886,42 @@ html,body,#root{height:100%;overflow:hidden}
 
         {/* Нижняя шторка со списком/вишлистом/чекинами/профилем */}
         {!sv&&(
-          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - 36px))"}}>
-            <div className="mob-sheet-handle" onClick={()=>setSheetOpen(o=>!o)}/>
+          <div className="mob-sheet" style={{
+            height: sheetOpen ? `${sheetHeight}vh` : "36px",
+            transition: sheetDragRef.current ? "none" : "height .3s cubic-bezier(.4,0,.2,1)"
+          }}>
+            <div className="mob-sheet-handle"
+              onTouchStart={e=>{
+                const startY=e.touches[0].clientY;
+                const startH=sheetHeight;
+                let moved=false;
+                const onMove=ev=>{
+                  moved=true;
+                  const dy=startY-ev.touches[0].clientY;
+                  const newH=Math.min(85,Math.max(20,startH+dy/window.innerHeight*100));
+                  setSheetHeight(newH);
+                  if(!sheetOpen)setSheetOpen(true);
+                };
+                const onEnd=()=>{
+                  sheetDragRef.current=false;
+                  if(!moved){
+                    // просто тап — toggle
+                    setSheetOpen(o=>{
+                      if(!o){setSheetHeight(55);}
+                      return !o;
+                    });
+                  } else {
+                    // после драга — если совсем маленькая то свернуть
+                    if(sheetHeight<15)setSheetOpen(false);
+                  }
+                  document.removeEventListener("touchmove",onMove);
+                  document.removeEventListener("touchend",onEnd);
+                };
+                sheetDragRef.current=true;
+                document.addEventListener("touchmove",onMove,{passive:true});
+                document.addEventListener("touchend",onEnd);
+              }}
+            />
 
             {tab==="map"&&(
               <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
