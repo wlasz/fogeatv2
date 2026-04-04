@@ -1824,7 +1824,15 @@ html,body,#root{height:100%;overflow:hidden}
           <span style={{color:"#999",fontSize:12}}>{photoViewer.index+1} / {photoViewer.photos.length}</span>
           <button onClick={()=>setPhotoViewer(null)} style={{background:"none",border:"none",color:"#fff",fontSize:24,cursor:"pointer",padding:"4px 8px"}}>✕</button>
         </div>
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}} onClick={e=>e.stopPropagation()}>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}
+          onClick={e=>e.stopPropagation()}
+          onTouchStart={e=>{e.currentTarget._sx=e.touches[0].clientX;}}
+          onTouchEnd={e=>{
+            const dx=e.changedTouches[0].clientX-e.currentTarget._sx;
+            if(Math.abs(dx)>50){
+              setPhotoViewer(v=>({...v,index:dx<0?(v.index+1)%v.photos.length:(v.index-1+v.photos.length)%v.photos.length}));
+            }
+          }}>
           <img src={photoViewer.photos[photoViewer.index].src} alt=""
             style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain"}}/>
           {photoViewer.photos.length>1&&<>
@@ -1834,10 +1842,11 @@ html,body,#root{height:100%;overflow:hidden}
               style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"rgba(255,255,255,.15)",border:"none",color:"#fff",fontSize:24,width:44,height:44,borderRadius:"50%",cursor:"pointer"}}>›</button>
           </>}
         </div>
-        <div style={{display:"flex",gap:6,padding:"12px 16px",overflowX:"auto",flexShrink:0}}>
+        <div style={{display:"flex",gap:8,padding:"12px 16px 20px",overflowX:"auto",flexShrink:0,alignItems:"center"}}
+          onClick={e=>e.stopPropagation()}>
           {photoViewer.photos.map((p,i)=>(
-            <div key={i} onClick={e=>{e.stopPropagation();setPhotoViewer(v=>({...v,index:i}));}}
-              style={{width:52,height:52,borderRadius:6,overflow:"hidden",flexShrink:0,opacity:i===photoViewer.index?1:.5,border:i===photoViewer.index?"2px solid #fff":"2px solid transparent",cursor:"pointer"}}>
+            <div key={i} onClick={()=>setPhotoViewer(v=>({...v,index:i}))}
+              style={{width:i===photoViewer.index?72:58,height:i===photoViewer.index?72:58,borderRadius:8,overflow:"hidden",flexShrink:0,opacity:i===photoViewer.index?1:.5,border:i===photoViewer.index?"2px solid #fff":"2px solid transparent",cursor:"pointer",transition:"all .2s"}}>
               <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
             </div>
           ))}
