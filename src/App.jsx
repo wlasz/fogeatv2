@@ -548,7 +548,7 @@ html,body,#root{height:100%;overflow:hidden}
 .mob-tab.a{color:var(--gold)}
 .mob-tab .ico{font-size:18px}
 .mob-sheet{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;overflow:hidden}
-.mob-sheet-handle{width:100%;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.mob-sheet-handle::after{content:"";display:block;width:36px;height:4px;background:var(--txt3);border-radius:2px;opacity:.6}
+.mob-sheet-handle{width:100%;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;position:relative}.mob-sheet-handle::after{content:"";display:block;width:36px;height:4px;background:var(--txt3);border-radius:2px;opacity:.6}.mob-sheet-tip{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--txt3);font-family:'Nunito';font-weight:700;opacity:.45;pointer-events:none}
 .mob-vp{position:fixed;inset:0;bottom:56px;background:var(--bg2);z-index:600;overflow-y:auto;animation:slideUp .25s ease}
 @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
 
@@ -932,7 +932,9 @@ html,body,#root{height:100%;overflow:hidden}
                 document.addEventListener("touchmove",onMove,{passive:true});
                 document.addEventListener("touchend",onEnd);
               }}
-            />
+            >
+              <span className="mob-sheet-tip">{sheetOpen?"нажми, чтобы свернуть":"нажми, чтобы развернуть"}</span>
+            </div>
 
             {tab==="map"&&(
               <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
