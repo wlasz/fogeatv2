@@ -274,10 +274,13 @@ export default function FogEat(){
   useEffect(()=>{
     if(!sv)return;
     const load=async()=>{
-      const myci=checkins.filter(c=>c.venueId===sv.id&&c.photoKey);
+      const myci=checkins.filter(c=>c.venueId===sv.id);
       const photos={};
       for(const c of myci){
-        try{const r=await window.storage.get(c.photoKey);if(r)photos[c.id]=r.value;}catch(e){}
+        if(c.photoUrl){photos[c.id]=c.photoUrl;}
+        else if(c.photoKey){
+          try{const r=await storage.get(c.photoKey);if(r)photos[c.id]=r.value;}catch(e){}
+        }
       }
       setCheckinPhotos(p=>({...p,...photos}));
     };
@@ -422,16 +425,28 @@ export default function FogEat(){
     const now=new Date();
     const id=Date.now();
     let photoKey=null;
+    let photoUrl=null;
     if(checkinPhoto){
-      photoKey=`fogeat-photo-${id}`;
-      try{await window.storage.set(photoKey,checkinPhoto);}catch(e){}
+      // конвертируем base64 в blob и загружаем в Supabase Storage
+      try{
+        const {supabase}=await import('./lib/storage.js');
+        const res=await fetch(checkinPhoto);
+        const blob=await res.blob();
+        const path=`${venue.id}/${id}.jpg`;
+        const{error}=await supabase.storage.from('checkin-photos').upload(path,blob,{contentType:'image/jpeg',upsert:true});
+        if(!error){
+          const{data}=supabase.storage.from('checkin-photos').getPublicUrl(path);
+          photoKey=path;
+          photoUrl=data.publicUrl;
+        }
+      }catch(e){}
     }
     const newCheckin={
       id,venueId:venue.id,venueName:venue.n,
       dish:dishName||"Блюдо",rating:cr,review:reviewText,
       price:price,date:now.toLocaleDateString("ru-RU"),
       time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
-      photoKey,
+      photoKey,photoUrl,
     };
     const updated=[newCheckin,...checkins];
     setCheckins(updated);
@@ -885,7 +900,7 @@ html,body,#root{height:100%;overflow:hidden}
                     <div className="ci-top"><span className="ci-dish">{c.dish||"Чекин"}</span><span className="ci-date">{c.date} {c.time}</span></div>
                     {c.rating>0&&<div style={{fontSize:11,color:"var(--gold)",margin:"2px 0"}}>★ {c.rating}</div>}
                     {c.review&&<div className="ci-review">«{c.review}»</div>}
-                    <button onClick={async()=>{if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});}}
+                    <button onClick={async()=>{if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});}}
                       style={{display:"block",marginTop:6,marginLeft:"auto",padding:"2px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.3)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>🗑 удалить</button>
                   </div>
                 ))}
@@ -999,7 +1014,7 @@ html,body,#root{height:100%;overflow:hidden}
                       </div>
                       {c.review&&<div className="ck-review">«{c.review}»</div>}
                     </div>
-                    <button onClick={async()=>{if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);}}
+                    <button onClick={async()=>{if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);}}
                       style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                   </div>
                 ))}
@@ -1190,7 +1205,7 @@ html,body,#root{height:100%;overflow:hidden}
                     {c.review&&<div className="ck-review">«{c.review}»</div>}
                   </div>
                   <button onClick={async()=>{
-                    if(c.photoKey){try{await storage.delete(c.photoKey);}catch(e){}}
+                    if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
                     const updated=checkins.filter(ch=>ch.id!==c.id);
                     setCheckins(updated);saveCheckins(updated);
                   }} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
@@ -1375,7 +1390,9 @@ html,body,#root{height:100%;overflow:hidden}
                     {menuPhotos[sv.id].map((p,i)=>(
                       <div key={i} style={{width:96,height:96,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)"}}>
                         <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                        <button onClick={()=>{
+                        <button onClick={async()=>{
+                          const photo=menuPhotos[sv.id][i];
+                          if(photo.path){const{supabase}=await import('./lib/storage.js');await supabase.storage.from('menu-photos').remove([photo.path]);}
                           const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
                           setMenuPhotos(updated);saveMenuPhotos(updated);
                         }} style={{position:"absolute",top:4,right:4,width:20,height:20,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800}}>×</button>
@@ -1420,7 +1437,7 @@ html,body,#root{height:100%;overflow:hidden}
                       {c.price&&<div style={{fontSize:10,color:"var(--txt3)"}}>{c.price}₽</div>}
                       {c.review&&<div className="ci-review">«{c.review}»</div>}
                       <button onClick={async()=>{
-                        if(c.photoKey){try{await window.storage.delete(c.photoKey);}catch(e){}}
+                        if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
                         const updated=checkins.filter(ch=>ch.id!==c.id);
                         setCheckins(updated);saveCheckins(updated);
                         setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
@@ -1573,22 +1590,24 @@ html,body,#root{height:100%;overflow:hidden}
             <div className="md-body">
               <label style={{display:"block",cursor:"pointer",marginBottom:10}}>
                 <input type="file" accept="image/*" style={{display:"none"}}
-                  onChange={e=>{
+                  onChange={async e=>{
                     const file=e.target.files[0];
                     if(!file)return;
-                    const reader=new FileReader();
-                    reader.onload=ev=>{
-                      const now=new Date();
-                      const photo={
-                        src:ev.target.result,
-                        date:now.toLocaleDateString("ru-RU"),
-                        time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
-                      };
-                      const existing=menuPhotos[sv.id]||[];
-                      const updated={...menuPhotos,[sv.id]:[...existing,photo]};
-                      setMenuPhotos(updated);saveMenuPhotos(updated);
+                    const {supabase}=await import('./lib/storage.js');
+                    const now=new Date();
+                    const path=`${sv.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+                    const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
+                    if(error){alert('Ошибка загрузки фото');return;}
+                    const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
+                    const photo={
+                      src:data.publicUrl,
+                      path,
+                      date:now.toLocaleDateString("ru-RU"),
+                      time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
                     };
-                    reader.readAsDataURL(file);
+                    const existing=menuPhotos[sv.id]||[];
+                    const updated={...menuPhotos,[sv.id]:[...existing,photo]};
+                    setMenuPhotos(updated);saveMenuPhotos(updated);
                   }}/>
                 <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"var(--txt3)",fontSize:12,transition:"all .2s"}}
                   onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)"}}
