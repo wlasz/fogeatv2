@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { storage, supabase } from './lib/storage.js';
 
 const V=[
 {id:1,n:"Cuprum",c:"Ресторан",s:"Европейская",a:"ул. Коцоева, 75",i:"🏛️",r:4.5,rc:197,ig:"cuprum_restaurant",lat:43.0268,lng:44.6744},
@@ -429,7 +430,7 @@ export default function FogEat(){
     if(checkinPhoto){
       // конвертируем base64 в blob и загружаем в Supabase Storage
       try{
-        const {supabase}=await import('./lib/storage.js');
+        
         const res=await fetch(checkinPhoto);
         const blob=await res.blob();
         const path=`${venue.id}/${id}.jpg`;
@@ -1392,7 +1393,7 @@ html,body,#root{height:100%;overflow:hidden}
                         <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
                         <button onClick={async()=>{
                           const photo=menuPhotos[sv.id][i];
-                          if(photo.path){const{supabase}=await import('./lib/storage.js');await supabase.storage.from('menu-photos').remove([photo.path]);}
+                          if(photo.path){await supabase.storage.from('menu-photos').remove([photo.path]);}
                           const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
                           setMenuPhotos(updated);saveMenuPhotos(updated);
                         }} style={{position:"absolute",top:4,right:4,width:20,height:20,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800}}>×</button>
@@ -1593,7 +1594,7 @@ html,body,#root{height:100%;overflow:hidden}
                   onChange={async e=>{
                     const files=Array.from(e.target.files);
                     if(!files.length)return;
-                    const {supabase}=await import('./lib/storage.js');
+                    
                     const now=new Date();
                     const newPhotos=[];
                     for(const file of files){
