@@ -499,6 +499,12 @@ export default function FogEat(){
     </div>
   );
 
+  const swipeClose=(onClose)=>({
+    onTouchStart:e=>{e.currentTarget._sx=e.touches[0].clientX;e.currentTarget._sy=e.touches[0].clientY;e.currentTarget._moved=false;},
+    onTouchMove:e=>{const dx=e.touches[0].clientX-e.currentTarget._sx;const dy=Math.abs(e.touches[0].clientY-e.currentTarget._sy);if(dx>10&&dy<80)e.currentTarget._moved=true;},
+    onTouchEnd:e=>{const dx=e.changedTouches[0].clientX-e.currentTarget._sx;if(e.currentTarget._moved&&dx>80)onClose();}
+  });
+
   const myCheckins=checkins.filter(c=>c.venueId===sv?.id);
   const isWished=sv&&wishVenues.find(w=>w.id===sv.id);
 
@@ -798,16 +804,7 @@ html,body,#root{height:100%;overflow:hidden}
           const myci=checkins.filter(c=>c.venueId===sv.id);
           return(
             <div className="mob-vp"
-              onTouchStart={e=>{e.currentTarget._sx=e.touches[0].clientX;e.currentTarget._sy=e.touches[0].clientY;e.currentTarget._moved=false;}}
-              onTouchMove={e=>{
-                const dx=e.touches[0].clientX-e.currentTarget._sx;
-                const dy=Math.abs(e.touches[0].clientY-e.currentTarget._sy);
-                if(dx>10&&dy<60)e.currentTarget._moved=true;
-              }}
-              onTouchEnd={e=>{
-                const dx=e.changedTouches[0].clientX-e.currentTarget._sx;
-                if(e.currentTarget._moved&&dx>80)setSv(null);
-              }}
+              {...swipeClose(()=>setSv(null))}
             >
               <div style={{position:"sticky",top:0,background:"var(--bg2)",zIndex:10,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 8px",borderBottom:"1px solid var(--border)"}}>
                 <div style={{fontFamily:"'Dela Gothic One'",fontSize:16}}>{sv.n}</div>
@@ -1462,7 +1459,7 @@ html,body,#root{height:100%;overflow:hidden}
     {/* CHECKIN MODAL */}
     {sc&&(
       <div className="mo" onClick={()=>{setSc(false);setCs(2);setCr(0);setCheckinPhoto(null);setDishName("");setReviewText("");setPrice("");}}>
-        <div className="md" onClick={e=>e.stopPropagation()}>
+        <div className="md" onClick={e=>e.stopPropagation()} {...swipeClose(()=>{setSc(false);setCheckinPhoto(null);setDishName("");setReviewText("");setPrice("");})}>
           <div className="md-head">
             <div className="md-title">🍽️ Блюдо и фото</div>
             {(sv||selectedVenueForCheckin)&&<div style={{fontSize:11,color:"var(--txt3)",textAlign:"center",marginBottom:6}}>{(selectedVenueForCheckin||sv).n}</div>}
@@ -1587,9 +1584,12 @@ html,body,#root{height:100%;overflow:hidden}
       };
       return(
         <div className="mo" onClick={()=>setShowMenuModal(false)}>
-          <div className="md" onClick={e=>e.stopPropagation()}>
+          <div className="md" onClick={e=>e.stopPropagation()} {...swipeClose(()=>setShowMenuModal(false))}>
             <div className="md-head">
-              <div className="md-title">📋 Меню заведения</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <button onClick={()=>setShowMenuModal(false)} style={{background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",padding:"0 4px",lineHeight:1}}>‹</button>
+                <div className="md-title" style={{marginBottom:0}}>📋 Меню заведения</div>
+              </div>
               <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>{sv.n}</div>
             </div>
             <div className="md-body">
@@ -1626,13 +1626,16 @@ html,body,#root{height:100%;overflow:hidden}
                 <div style={{fontSize:11,fontWeight:800,color:"var(--txt2)",marginBottom:8}}>Добавлено {menuPhotos[sv.id].length} фото</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
                   {menuPhotos[sv.id].map((p,i)=>(
-                    <div key={i} style={{width:90,height:90,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)"}}>
+                    <div key={i} style={{width:90,height:90,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)",cursor:"pointer"}}
+                      onClick={()=>setPhotoViewer({photos:menuPhotos[sv.id],index:i})}>
                       <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      <button onClick={()=>{
+                      <button onClick={async e=>{
+                        e.stopPropagation();
+                        const photo=menuPhotos[sv.id][i];
+                        if(photo.path){await supabase.storage.from('menu-photos').remove([photo.path]);}
                         const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
                         setMenuPhotos(updated);saveMenuPhotos(updated);
-                      }} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(0,0,0,.7)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(0,0,0,.6)",fontSize:8,color:"#aaa",padding:"2px 4px",textAlign:"center"}}>{p.date}</div>
+                      }} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                     </div>
                   ))}
                 </div>
@@ -1648,7 +1651,7 @@ html,body,#root{height:100%;overflow:hidden}
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}
         onClick={()=>setShowLabelManager(false)}>
         <div style={{width:380,maxHeight:"80vh",background:"var(--bg2)",borderRadius:16,border:"1px solid var(--border)",display:"flex",flexDirection:"column",overflow:"hidden"}}
-          onClick={e=>e.stopPropagation()}>
+          onClick={e=>e.stopPropagation()} {...swipeClose(()=>setShowLabelManager(false))}>
           <div style={{padding:"16px 18px 12px",borderBottom:"1px solid var(--border)",fontFamily:"'Dela Gothic One'",fontSize:15}}>🏷️ Мои теги</div>
           <div style={{padding:"12px 18px",overflowY:"auto",flex:1}}>
             {customLabels.map(l=>(
