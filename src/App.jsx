@@ -541,12 +541,12 @@ html,body,#root{height:100%;overflow:hidden}
 /* MOBILE */
 .mob-map{position:fixed;top:0;left:0;right:0;bottom:0;z-index:0}
 .mob-hdr{position:fixed;top:0;left:0;right:0;height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;z-index:500}
-.mob-tabs{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:500;padding-bottom:env(safe-area-inset-bottom,16px)}
+.mob-tabs{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:600;padding-bottom:env(safe-area-inset-bottom,16px);height:calc(56px + env(safe-area-inset-bottom,16px))}
 .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:800;color:var(--txt3);border:none;background:none;cursor:pointer;font-family:'Nunito';padding:6px 0}
 .mob-tab.a{color:var(--gold)}
 .mob-tab .ico{font-size:18px}
-.mob-sheet{position:fixed;left:0;right:0;bottom:0;padding-bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:75vh}
-.mob-sheet-handle{width:36px;height:4px;background:var(--txt3);border-radius:2px;margin:10px auto 6px;flex-shrink:0;cursor:pointer;opacity:.6}
+.mob-sheet{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,16px));background:var(--bg2);border-top:1px solid var(--border);border-radius:16px 16px 0 0;z-index:400;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.4,0,.2,1);max-height:72vh}
+.mob-sheet-handle{width:100%;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}.mob-sheet-handle::after{content:"";display:block;width:36px;height:4px;background:var(--txt3);border-radius:2px;opacity:.6}
 .mob-vp{position:fixed;inset:0;bottom:56px;background:var(--bg2);z-index:600;overflow-y:auto;animation:slideUp .25s ease}
 @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
 
@@ -884,17 +884,8 @@ html,body,#root{height:100%;overflow:hidden}
 
         {/* Нижняя шторка со списком/вишлистом/чекинами/профилем */}
         {!sv&&(
-          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - calc(56px + env(safe-area-inset-bottom,16px) + 44px)))"}}>
+          <div className="mob-sheet" style={{transform:sheetOpen?"translateY(0)":"translateY(calc(100% - 36px))"}}>
             <div className="mob-sheet-handle" onClick={()=>setSheetOpen(o=>!o)}/>
-            {/* Мини-табы внутри шторки */}
-            <div style={{display:"flex",borderBottom:"1px solid var(--border)",flexShrink:0}}>
-              {[["map","📍","Места"],["wishlist","📌","Вишлист"],["checkins","✅","Чекины"],["profile","👤","Профиль"]].map(([k,ico,lbl])=>(
-                <button key={k} onClick={()=>setTab(k)}
-                  style={{flex:1,padding:"8px 4px",background:"none",border:"none",borderBottom:`2px solid ${tab===k?"var(--gold)":"transparent"}`,color:tab===k?"var(--gold)":"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:9,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                  <span style={{fontSize:15}}>{ico}</span>{lbl}
-                </button>
-              ))}
-            </div>
 
             {tab==="map"&&(
               <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
@@ -992,6 +983,15 @@ html,body,#root{height:100%;overflow:hidden}
             )}
           </div>
         )}
+
+        {/* Фиксированный таббар снизу */}
+        <div className="mob-tabs">
+          {[["map","📍","Места"],["wishlist","📌","Вишлист"],["checkins","✅","Чекины"],["profile","👤","Профиль"]].map(([k,ico,lbl])=>(
+            <button key={k} className={`mob-tab ${tab===k?"a":""}`} onClick={()=>{setTab(k);if(!sheetOpen)setSheetOpen(true);}}>
+              <span className="ico">{ico}</span>{lbl}
+            </button>
+          ))}
+        </div>
 
       </>
     ) : (
