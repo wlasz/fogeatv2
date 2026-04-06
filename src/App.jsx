@@ -198,6 +198,7 @@ export default function FogEat(){
   const[selectedVenueForCheckin,setSelectedVenueForCheckin]=useState(null);
   const[menuPhotos,setMenuPhotos]=useState({});
   const[showMenuModal,setShowMenuModal]=useState(false);
+  const[photoViewer,setPhotoViewer]=useState(null);
   const[checkinPhotos,setCheckinPhotos]=useState({});
   const[venueNotes,setVenueNotes]=useState({});
   const[customLabels,setCustomLabels]=useState([]);   // [{id,name,emoji,color}]
