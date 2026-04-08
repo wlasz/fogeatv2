@@ -163,7 +163,7 @@ export default function FogEat(){
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
   const[fontsReady,setFontsReady]=useState(false);
-  const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);
+  const[isMobile,setIsMobile]=useState(()=>{try{return window.innerWidth<768;}catch(e){return true;}});
   const[sheetOpen,setSheetOpen]=useState(true);
   const[confirmDeleteCheckin,setConfirmDeleteCheckin]=useState(null);
   const sheetDragRef=useRef(null);
@@ -297,8 +297,8 @@ export default function FogEat(){
       const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";s.onload=()=>setLr(true);document.head.appendChild(s);
     }else{setLr(true);}
     // сплэш — ждём шрифты + минимум 1.2с
-    const t=setTimeout(()=>setFontsReady(true),1200);
-    document.fonts.ready.then(()=>setTimeout(()=>setFontsReady(true),300));
+    const t=setTimeout(()=>setFontsReady(true),1500);
+    try{document.fonts.ready.then(()=>{clearTimeout(t);setTimeout(()=>setFontsReady(true),200);});}catch(e){}
     return()=>clearTimeout(t);
   },[]);
 
@@ -563,7 +563,7 @@ export default function FogEat(){
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#root{height:100%;overflow:hidden}
-.app{display:flex;flex-direction:column;height:100vh;background:var(--bg);font-family:'Nunito',sans-serif;color:var(--txt);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);font-family:'Nunito',sans-serif;color:var(--txt);overflow:hidden}
 
 /* MOBILE */
 .mob-map{position:fixed;top:0;left:0;right:0;bottom:0;z-index:0}
