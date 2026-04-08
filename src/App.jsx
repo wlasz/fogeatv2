@@ -184,6 +184,7 @@ function FogEat(){
   const[fontsReady,setFontsReady]=useState(true);
   const[isMobile,setIsMobile]=useState(()=>{try{return window.innerWidth<768;}catch(e){return true;}});
   const[sheetOpen,setSheetOpen]=useState(true);
+  const[sheetHeight,setSheetHeight]=useState(55);
   const[confirmDeleteCheckin,setConfirmDeleteCheckin]=useState(null);
   const sheetDragRef=useRef(null);
   const sheetElRef=useRef(null);
