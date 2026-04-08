@@ -1,6 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { storage } from './lib/storage.js';
 import { supabase } from './lib/supabase.js';
+
+class ErrorBoundary extends Component {
+  constructor(props){super(props);this.state={error:null};}
+  static getDerivedStateFromError(e){return{error:e.message};}
+  render(){
+    if(this.state.error)return(
+      <div style={{background:"#090c08",color:"#fff",padding:20,fontFamily:"sans-serif",height:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10}}>
+        <div style={{fontSize:24,color:"#e8a838"}}>FOGEAT</div>
+        <div style={{fontSize:12,color:"#888",textAlign:"center"}}>{this.state.error}</div>
+        <button onClick={()=>window.location.reload()} style={{marginTop:10,padding:"8px 20px",background:"#3d6b25",border:"none",color:"#fff",borderRadius:8,cursor:"pointer"}}>Обновить</button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 const V=[
 {id:1,n:"Cuprum",c:"Ресторан",s:"Европейская",a:"ул. Коцоева, 75",i:"🏛️",r:4.5,rc:197,ig:"cuprum_restaurant",lat:43.0268,lng:44.6744},
@@ -159,10 +174,14 @@ const INIT_ACHS=ACH_CHAINS;
 
 const INIT_USER={name:"Wlasz",level:1,title:"Новичок",xp:0,nxp:200,venues:0,checkins:0,reviews:0,photos:0};
 
-export default function FogEat(){
+export default function App(){
+  return <ErrorBoundary><FogEat/></ErrorBoundary>;
+}
+
+function FogEat(){
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
-  const[fontsReady,setFontsReady]=useState(false);
+  const[fontsReady,setFontsReady]=useState(true);
   const[isMobile,setIsMobile]=useState(()=>{try{return window.innerWidth<768;}catch(e){return true;}});
   const[sheetOpen,setSheetOpen]=useState(true);
   const[confirmDeleteCheckin,setConfirmDeleteCheckin]=useState(null);
