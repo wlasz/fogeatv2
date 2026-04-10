@@ -279,6 +279,7 @@ function AuthScreen(){
 function FogEat({session}){
   const currentUser=session?.user;
   const uid=currentUser?.id||'anonymous';
+  const[isAdmin,setIsAdmin]=useState(false);
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
   const[fontsReady,setFontsReady]=useState(true);
@@ -343,6 +344,11 @@ function FogEat({session}){
   useEffect(()=>{
     const g=async(key)=>{try{const r=await storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}};
     const load=async()=>{
+      // загружаем роль из profiles
+      if(currentUser){
+        const{data}=await supabase.from('profiles').select('role').eq('id',currentUser.id).single();
+        if(data?.role==='admin')setIsAdmin(true);
+      }
       const checkins=await g(`fogeat-checkins-${uid}`);if(checkins)setCheckins(checkins);
       const wv=await g(`fogeat-wishvenues-${uid}`);if(wv)setWishVenues(wv);
       const wd=await g(`fogeat-wishdishes-${uid}`);if(wd)setWishDishes(wd);
@@ -993,7 +999,7 @@ html,body,#root{height:100%;overflow:hidden}
                   📋 {menuPhotos[sv.id]?.length>0?`Меню (${menuPhotos[sv.id].length} фото)`:"Добавить меню"}
                 </button>
               </div>
-              <div style={{padding:"0 14px 12px"}}>
+              {(isAdmin||sv.custom)&&<div style={{padding:"0 14px 12px"}}>
                 {sv._confirmDelete?(
                   <div style={{borderRadius:10,border:"1.5px solid rgba(200,50,50,.5)",background:"rgba(200,50,50,.1)",padding:"10px 12px"}}>
                     <div style={{fontSize:11,fontWeight:800,color:"#d06060",marginBottom:8,textAlign:"center"}}>Удалить «{sv.n}»?</div>
@@ -1012,7 +1018,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
                     onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>🗑 Удалить заведение</button>
                 )}
-              </div>
+              </div>}
               {myci.length>0&&<>
                 <div className="sec-hdr">📸 Мои чекины <span style={{color:"var(--txt3)",fontWeight:400,fontSize:10}}>{myci.length}</span></div>
                 {myci.map((c,i)=>(
@@ -1501,7 +1507,7 @@ html,body,#root{height:100%;overflow:hidden}
                     📋 {menuPhotos[sv.id]?.length>0?`Меню (${menuPhotos[sv.id].length} фото)`:"Добавить меню"}
                   </button>
                 </div>
-                <div style={{padding:"0 14px 12px"}}>
+                {(isAdmin||sv.custom)&&<div style={{padding:"0 14px 12px"}}>
                   {sv._confirmDelete?(
                     <div style={{borderRadius:10,border:"1.5px solid rgba(200,50,50,.5)",background:"rgba(200,50,50,.1)",padding:"10px 12px"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#d06060",marginBottom:8,textAlign:"center"}}>Удалить «{sv.n}»?</div>
@@ -1529,7 +1535,7 @@ html,body,#root{height:100%;overflow:hidden}
                       🗑 Удалить заведение
                     </button>
                   )}
-                </div>
+                </div>}
                 {menuPhotos[sv.id]?.length>0&&<>
                   <div className="sec-hdr">📋 Меню заведения <span style={{color:"var(--txt3)",fontWeight:400,fontSize:10}}>{menuPhotos[sv.id].length} фото</span></div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"4px 14px 12px"}}>
