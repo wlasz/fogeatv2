@@ -1674,7 +1674,7 @@ html,body,#root{height:100%;overflow:hidden}
           onClick={e=>e.stopPropagation()}>
           <div style={{padding:"20px 20px 0",textAlign:"center"}}>
             <div style={{fontSize:36,marginBottom:6}}>{sv.i}</div>
-            <div style={{fontFamily:"'Dela Gothic One'",fontSize:17,marginBottom:3}}>{sv.n}</div>
+            <div style={{fontFamily:"'Dela Gothic One'",fontSize:17,marginBottom:3,color:"var(--txt)"}}>{sv.n}</div>
             <div style={{fontSize:11,color:"var(--txt3)",marginBottom:16}}>📍 {sv.a}</div>
           </div>
           <div style={{padding:"0 20px 20px"}}>
