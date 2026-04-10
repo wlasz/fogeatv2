@@ -1178,6 +1178,10 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="prof-title">Lv.{user.level} · {user.title}</div>
                   <div className="prof-xp-bar"><div className="prof-xp-fill" style={{width:`${(user.xp/user.nxp)*100}%`}}/></div>
                   <div className="prof-xp-lbl">{user.xp} / {user.nxp} XP</div>
+                  <button onClick={()=>supabase.auth.signOut()}
+                    style={{marginTop:12,padding:"6px 20px",borderRadius:8,border:"1px solid #333",background:"none",color:"var(--txt3)",fontFamily:"'Nunito'",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                    Выйти из аккаунта
+                  </button>
                 </div>
                 <div className="stats-grid">
                   {[{n:visitedIds.size,l:"Открыто"},{n:checkins.length,l:"Чекинов"},{n:checkins.filter(c=>c.review&&c.review.trim()).length,l:"Отзывов"},{n:checkins.filter(c=>c.photoKey).length,l:"Фото"}].map((s,i)=>(
@@ -1192,6 +1196,7 @@ html,body,#root{height:100%;overflow:hidden}
                     <div className="ach-cnt">{a.ok?"✅":`${a.p}/${a.t}`}</div>
                   </div>
                 ))}
+                {isAdmin&&<AdminPanel/>}
               </div>
             )}
           </div>
@@ -2030,3 +2035,113 @@ html,body,#root{height:100%;overflow:hidden}
     )}
 
   </>);}
+
+function AdminPanel(){
+  const[adminTab,setAdminTab]=useState("users");
+  const[users,setUsers]=useState([]);
+  const[allCheckins,setAllCheckins]=useState([]);
+  const[loading,setLoading]=useState(false);
+
+  useEffect(()=>{
+    loadData();
+  },[adminTab]);
+
+  const loadData=async()=>{
+    setLoading(true);
+    if(adminTab==="users"){
+      const{data}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
+      setUsers(data||[]);
+    }
+    if(adminTab==="checkins"){
+      const{data}=await supabase.from("fogeat_data").select("*").like("key","fogeat-checkins-%");
+      const all=[];
+      (data||[]).forEach(row=>{
+        try{
+          const uid=row.key.replace("fogeat-checkins-","");
+          const items=JSON.parse(row.value);
+          items.forEach(c=>all.push({...c,uid}));
+        }catch(e){}
+      });
+      setAllCheckins(all.sort((a,b)=>b.id-a.id));
+    }
+    setLoading(false);
+  };
+
+  const deleteCheckin=async(checkin)=>{
+    const key=`fogeat-checkins-${checkin.uid}`;
+    const{data}=await supabase.from("fogeat_data").select("value").eq("key",key).single();
+    if(!data)return;
+    const items=JSON.parse(data.value).filter(c=>c.id!==checkin.id);
+    await supabase.from("fogeat_data").update({value:JSON.stringify(items)}).eq("key",key);
+    if(checkin.photoKey){try{await supabase.storage.from("checkin-photos").remove([checkin.photoKey]);}catch(e){}}
+    setAllCheckins(p=>p.filter(c=>!(c.id===checkin.id&&c.uid===checkin.uid)));
+  };
+
+  const banUser=async(userId)=>{
+    if(!confirm("Удалить пользователя?"))return;
+    await supabase.from("profiles").delete().eq("id",userId);
+    setUsers(p=>p.filter(u=>u.id!==userId));
+  };
+
+  return(
+    <div style={{marginTop:16}}>
+      <div className="sec-hdr" style={{color:"#e8a838"}}>⚙️ Панель администратора</div>
+      <div style={{display:"flex",gap:0,margin:"8px 14px",background:"var(--bg3)",borderRadius:10,padding:3}}>
+        {[["users","👥 Пользователи"],["checkins","📸 Чекины"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setAdminTab(k)}
+            style={{flex:1,padding:"6px",borderRadius:8,border:"none",background:adminTab===k?"var(--grn)":"transparent",color:adminTab===k?"#fff":"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {loading&&<div style={{textAlign:"center",padding:20,color:"var(--txt3)",fontSize:12}}>Загрузка...</div>}
+
+      {!loading&&adminTab==="users"&&(
+        <div style={{padding:"0 14px"}}>
+          {users.map(u=>(
+            <div key={u.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"var(--grn)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Dela Gothic One'",fontSize:14,color:"#fff",flexShrink:0}}>
+                {(u.username||"?")[0].toUpperCase()}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:800,color:"var(--txt)"}}>{u.username||"—"}</div>
+                <div style={{fontSize:10,color:"var(--txt3)"}}>{u.role} · {new Date(u.created_at).toLocaleDateString("ru-RU")}</div>
+              </div>
+              {u.role!=="admin"&&(
+                <button onClick={()=>banUser(u.id)}
+                  style={{padding:"3px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                  удалить
+                </button>
+              )}
+            </div>
+          ))}
+          {users.length===0&&<div style={{textAlign:"center",padding:16,color:"var(--txt3)",fontSize:12}}>Нет пользователей</div>}
+        </div>
+      )}
+
+      {!loading&&adminTab==="checkins"&&(
+        <div style={{padding:"0 14px"}}>
+          {allCheckins.map((c,i)=>(
+            <div key={i} style={{padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:11,fontWeight:800,color:"var(--txt)"}}>{c.venueName}</div>
+                  <div style={{fontSize:10,color:"var(--txt3)"}}>@uid:{c.uid.slice(0,8)}… · {c.date}</div>
+                  {c.dish&&<div style={{fontSize:10,color:"var(--txt2)"}}>{c.dish}</div>}
+                  {c.review&&<div style={{fontSize:10,color:"var(--txt3)",fontStyle:"italic"}}>«{c.review.slice(0,60)}»</div>}
+                  {c.photoUrl&&<img src={c.photoUrl} alt="" style={{width:"100%",height:80,objectFit:"cover",borderRadius:6,marginTop:4}}/>}
+                </div>
+                <button onClick={()=>deleteCheckin(c)}
+                  style={{flexShrink:0,padding:"3px 8px",borderRadius:6,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                  удалить
+                </button>
+              </div>
+            </div>
+          ))}
+          {allCheckins.length===0&&<div style={{textAlign:"center",padding:16,color:"var(--txt3)",fontSize:12}}>Нет чекинов</div>}
+        </div>
+      )}
+    </div>
+  );
+}
