@@ -278,6 +278,7 @@ function AuthScreen(){
 
 function FogEat({session}){
   const currentUser=session?.user;
+  const uid=currentUser?.id||'anonymous';
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
   const[fontsReady,setFontsReady]=useState(true);
@@ -342,19 +343,19 @@ function FogEat({session}){
   useEffect(()=>{
     const g=async(key)=>{try{const r=await storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}};
     const load=async()=>{
-      const checkins=await g("fogeat-checkins");if(checkins)setCheckins(checkins);
-      const wv=await g("fogeat-wishvenues");if(wv)setWishVenues(wv);
-      const wd=await g("fogeat-wishdishes");if(wd)setWishDishes(wd);
-      const u=await g("fogeat-user");
-      if(u){if(u.checkins>0||u.xp>0){try{await storage.delete("fogeat-user");}catch(e){}}else{setUser(u);}}
+      const checkins=await g(`fogeat-checkins-${uid}`);if(checkins)setCheckins(checkins);
+      const wv=await g(`fogeat-wishvenues-${uid}`);if(wv)setWishVenues(wv);
+      const wd=await g(`fogeat-wishdishes-${uid}`);if(wd)setWishDishes(wd);
+      const u=await g(`fogeat-user-${uid}`);
+      if(u){if(u.checkins>0||u.xp>0){try{await storage.delete(`fogeat-user-${uid}`);}catch(e){}}else{setUser(u);}}
       try{await storage.delete("fogeat-achs");}catch(e){}
-      const mp=await g("fogeat-menuphotos");if(mp)setMenuPhotos(mp);
-      const cv=await g("fogeat-customvenues");if(cv)setCustomVenues(cv);
+      const mp=await g(`fogeat-menuphotos-${uid}`);if(mp)setMenuPhotos(mp);
+      const cv=await g(`fogeat-customvenues-${uid}`);if(cv)setCustomVenues(cv);
       // резервный список удалённых ID
-      if(!cv){const del=await g("fogeat-deleted");if(del&&del.length)setCustomVenues(del.map(id=>({id,deleted:true})));}
-      const vn=await g("fogeat-venuenotes");if(vn)setVenueNotes(vn);
-      const cl=await g("fogeat-customlabels");if(cl)setCustomLabels(cl);
-      const vl=await g("fogeat-venuelabels");if(vl)setVenueLabels(vl);
+      if(!cv){const del=await g(`fogeat-deleted-${uid}`);if(del&&del.length)setCustomVenues(del.map(id=>({id,deleted:true})));}
+      const vn=await g(`fogeat-venuenotes-${uid}`);if(vn)setVenueNotes(vn);
+      const cl=await g(`fogeat-customlabels-${uid}`);if(cl)setCustomLabels(cl);
+      const vl=await g(`fogeat-venuelabels-${uid}`);if(vl)setVenueLabels(vl);
     };
     load();
   },[]);
@@ -377,20 +378,20 @@ function FogEat({session}){
 
 
 
-  const saveMenuPhotos=async(data)=>{try{await storage.set("fogeat-menuphotos",JSON.stringify(data));}catch(e){}};
-  const saveVenueNotes=async(data)=>{try{await storage.set("fogeat-venuenotes",JSON.stringify(data));}catch(e){}};
-  const saveCustomLabels=async(data)=>{try{await storage.set("fogeat-customlabels",JSON.stringify(data));}catch(e){}};
-  const saveVenueLabels=async(data)=>{try{await storage.set("fogeat-venuelabels",JSON.stringify(data));}catch(e){}};
+  const saveMenuPhotos=async(data)=>{try{await storage.set(`fogeat-menuphotos-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveVenueNotes=async(data)=>{try{await storage.set(`fogeat-venuenotes-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveCustomLabels=async(data)=>{try{await storage.set(`fogeat-customlabels-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveVenueLabels=async(data)=>{try{await storage.set(`fogeat-venuelabels-${uid}`,JSON.stringify(data));}catch(e){}};
 
-  const saveCheckins=async(data)=>{try{await storage.set("fogeat-checkins",JSON.stringify(data));}catch(e){}};
-  const saveWishVenues=async(data)=>{try{await storage.set("fogeat-wishvenues",JSON.stringify(data));}catch(e){}};
-  const saveWishDishes=async(data)=>{try{await storage.set("fogeat-wishdishes",JSON.stringify(data));}catch(e){}};
-  const saveUser=async(data)=>{try{await storage.set("fogeat-user",JSON.stringify(data));}catch(e){}};
+  const saveCheckins=async(data)=>{try{await storage.set(`fogeat-checkins-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveWishVenues=async(data)=>{try{await storage.set(`fogeat-wishvenues-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveWishDishes=async(data)=>{try{await storage.set(`fogeat-wishdishes-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveUser=async(data)=>{try{await storage.set(`fogeat-user-${uid}`,JSON.stringify(data));}catch(e){}};
   const saveCustomVenues=async(data)=>{
-    try{await storage.set("fogeat-customvenues",JSON.stringify(data));}catch(e){}
+    try{await storage.set(`fogeat-customvenues-${uid}`,JSON.stringify(data));}catch(e){}
     // дополнительно сохраняем список удалённых ID отдельно
     const delIds=data.filter(v=>v.deleted).map(v=>v.id);
-    try{await storage.set("fogeat-deleted",JSON.stringify(delIds));}catch(e){}
+    try{await storage.set(`fogeat-deleted-${uid}`,JSON.stringify(delIds));}catch(e){}
   };
 
   // загружаем фото чекинов когда открывается панель заведения
