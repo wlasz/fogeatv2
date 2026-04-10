@@ -175,10 +175,109 @@ const INIT_ACHS=ACH_CHAINS;
 const INIT_USER={name:"Wlasz",level:1,title:"Новичок",xp:0,nxp:200,venues:0,checkins:0,reviews:0,photos:0};
 
 export default function App(){
-  return <ErrorBoundary><FogEat/></ErrorBoundary>;
+  return <ErrorBoundary><AuthWrapper/></ErrorBoundary>;
 }
 
-function FogEat(){
+function AuthWrapper(){
+  const[session,setSession]=useState(undefined); // undefined = loading
+
+  useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>setSession(session));
+    const{data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>setSession(session));
+    return()=>subscription.unsubscribe();
+  },[]);
+
+  if(session===undefined)return(
+    <div style={{background:"#090c08",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{fontFamily:"'Dela Gothic One',sans-serif",fontSize:32,color:"#7fd458",letterSpacing:3}}>FOG<span style={{color:"#e8a838"}}>EAT</span></div>
+    </div>
+  );
+
+  if(!session)return<AuthScreen/>;
+  return<FogEat session={session}/>;
+}
+
+function AuthScreen(){
+  const[mode,setMode]=useState("login"); // login | register
+  const[email,setEmail]=useState("");
+  const[password,setPassword]=useState("");
+  const[username,setUsername]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState("");
+  const[success,setSuccess]=useState("");
+
+  const handle=async()=>{
+    setError("");setSuccess("");setLoading(true);
+    if(mode==="login"){
+      const{error}=await supabase.auth.signInWithPassword({email,password});
+      if(error)setError(error.message);
+    } else {
+      if(!username.trim()){setError("Введи username");setLoading(false);return;}
+      const{data,error}=await supabase.auth.signUp({email,password});
+      if(error){setError(error.message);}
+      else if(data.user){
+        await supabase.from("profiles").insert({id:data.user.id,username:username.trim().toLowerCase()});
+        setSuccess("Проверь email — отправили письмо для подтверждения");
+      }
+    }
+    setLoading(false);
+  };
+
+  return(
+    <div style={{background:"#090c08",minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"'Nunito',sans-serif"}}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Nunito:wght@400;700;800&display=swap');`}</style>
+      <div style={{marginBottom:32,textAlign:"center"}}>
+        <div style={{fontFamily:"'Dela Gothic One',sans-serif",fontSize:36,color:"#7fd458",letterSpacing:3}}>FOG<span style={{color:"#e8a838"}}>EAT</span></div>
+        <div style={{fontSize:12,color:"#5a5648",marginTop:4}}>Владикавказ · Твой дневник мест</div>
+      </div>
+
+      <div style={{width:"100%",maxWidth:360,background:"#0f1410",borderRadius:16,border:"1px solid #222820",padding:24}}>
+        <div style={{display:"flex",gap:0,marginBottom:20,background:"#1a201a",borderRadius:10,padding:3}}>
+          {["login","register"].map(m=>(
+            <button key={m} onClick={()=>{setMode(m);setError("");setSuccess("");}}
+              style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:mode===m?"#3d6b25":"transparent",color:mode===m?"#fff":"#5a5648",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+              {m==="login"?"Войти":"Регистрация"}
+            </button>
+          ))}
+        </div>
+
+        {mode==="register"&&(
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:800,color:"#9a9480",marginBottom:4}}>Username</div>
+            <input value={username} onChange={e=>setUsername(e.target.value)}
+              placeholder="например: wlasz"
+              style={{width:"100%",padding:"10px 12px",background:"#1a201a",border:"1px solid #222820",borderRadius:10,color:"#ddd8cc",fontFamily:"'Nunito'",fontSize:13,outline:"none"}}/>
+          </div>
+        )}
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,color:"#9a9480",marginBottom:4}}>Email</div>
+          <input value={email} onChange={e=>setEmail(e.target.value)} type="email"
+            placeholder="your@email.com"
+            style={{width:"100%",padding:"10px 12px",background:"#1a201a",border:"1px solid #222820",borderRadius:10,color:"#ddd8cc",fontFamily:"'Nunito'",fontSize:13,outline:"none"}}/>
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:10,fontWeight:800,color:"#9a9480",marginBottom:4}}>Пароль</div>
+          <input value={password} onChange={e=>setPassword(e.target.value)} type="password"
+            placeholder="минимум 6 символов"
+            style={{width:"100%",padding:"10px 12px",background:"#1a201a",border:"1px solid #222820",borderRadius:10,color:"#ddd8cc",fontFamily:"'Nunito'",fontSize:13,outline:"none"}}/>
+        </div>
+
+        {error&&<div style={{color:"#c05050",fontSize:11,marginBottom:12,textAlign:"center"}}>{error}</div>}
+        {success&&<div style={{color:"#7fd458",fontSize:11,marginBottom:12,textAlign:"center"}}>{success}</div>}
+
+        <button onClick={handle} disabled={loading||!email||!password}
+          style={{width:"100%",padding:12,borderRadius:10,border:"none",background:"linear-gradient(90deg,#e8a838,#ffc857)",color:"#090c08",fontFamily:"'Nunito'",fontWeight:800,fontSize:14,cursor:"pointer",opacity:loading||!email||!password?0.5:1}}>
+          {loading?"...":(mode==="login"?"Войти":"Создать аккаунт")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FogEat({session}){
+  const currentUser=session?.user;
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
   const[lr,setLr]=useState(false);
   const[fontsReady,setFontsReady]=useState(true);
@@ -1116,6 +1215,10 @@ html,body,#root{height:100%;overflow:hidden}
           <div className="hav-icon">{user.name[0]}</div>
           <div><div className="hav-name">{user.name}</div><div className="hav-lvl">Lv.{user.level} {user.title}</div></div>
         </div>
+        <button onClick={()=>supabase.auth.signOut()} title="Выйти"
+          style={{background:"none",border:"1px solid #222820",borderRadius:8,color:"#5a5648",fontSize:11,cursor:"pointer",padding:"4px 8px",fontFamily:"'Nunito'",fontWeight:700}}>
+          ⎋
+        </button>
       </div>
 
       <div className="main">
