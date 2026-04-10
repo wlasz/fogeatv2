@@ -346,8 +346,9 @@ function FogEat({session}){
     const load=async()=>{
       // загружаем роль из profiles
       if(currentUser){
-        const{data}=await supabase.from('profiles').select('role').eq('id',currentUser.id).single();
+        const{data}=await supabase.from('profiles').select('role,username').eq('id',currentUser.id).single();
         if(data?.role==='admin')setIsAdmin(true);
+        if(data?.username)setUser(u=>({...u,name:data.username}));
       }
       const checkins=await g(`fogeat-checkins-${uid}`);if(checkins)setCheckins(checkins);
       const wv=await g(`fogeat-wishvenues-${uid}`);if(wv)setWishVenues(wv);
@@ -1372,9 +1373,14 @@ html,body,#root{height:100%;overflow:hidden}
               <div className="prof-hero">
                 <div className="prof-av">{user.name[0]}</div>
                 <div className="prof-name">{user.name}</div>
+                {currentUser&&<div style={{fontSize:10,color:"var(--txt3)",marginBottom:4}}>{currentUser.email}</div>}
                 <div className="prof-title">Lv.{user.level} · {user.title}</div>
                 <div className="prof-xp-bar"><div className="prof-xp-fill" style={{width:`${(user.xp/user.nxp)*100}%`}}/></div>
                 <div className="prof-xp-lbl">{user.xp} / {user.nxp} XP</div>
+                <button onClick={()=>supabase.auth.signOut()}
+                  style={{marginTop:12,padding:"6px 20px",borderRadius:8,border:"1px solid #333",background:"none",color:"var(--txt3)",fontFamily:"'Nunito'",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                  Выйти из аккаунта
+                </button>
               </div>
               <div className="stats-grid">
                 {[
