@@ -1412,6 +1412,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="ach-cnt">{a.ok?"✅":`${a.p}/${a.t}`}</div>
                 </div>
               ))}
+              {isAdmin&&<AdminPanel/>}
             </div>
           )}
         </div>
