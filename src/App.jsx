@@ -2248,7 +2248,7 @@ function AdminPanel(){
           {pendingMenus.map(photo=>(
             <div key={photo.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
               <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>
-                Заведение ID: {photo.venue_id} · {new Date(photo.created_at).toLocaleDateString("ru-RU")}
+                Заведение: <span style={{color:"var(--txt)",fontWeight:800}}>{(()=>{const v=V.find(v=>v.id===photo.venue_id);return v?v.n:`ID ${photo.venue_id}`;})()}</span> · {new Date(photo.created_at).toLocaleDateString("ru-RU")}
               </div>
               <img src={photo.photo_url} alt="" style={{width:"100%",borderRadius:8,marginBottom:8,maxHeight:300,objectFit:"contain",background:"var(--bg3)"}}/>
               <div style={{display:"flex",gap:8}}>
