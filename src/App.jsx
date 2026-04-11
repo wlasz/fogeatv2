@@ -335,6 +335,7 @@ function FogEat({session}){
   const[visitRating,setVisitRating]=useState(0);
   const[showAddVenue,setShowAddVenue]=useState(false);
   const[customVenues,setCustomVenues]=useState([]);
+  const[venueRatings,setVenueRatings]=useState({}); // {venueId: {avg, count}}
   const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
   const[geoSearch,setGeoSearch]=useState("");
   const[geoLoading,setGeoLoading]=useState(false);
@@ -376,6 +377,23 @@ function FogEat({session}){
       // кастомные заведения из таблицы
       const{data:cv}=await supabase.from('custom_venues').select('*').eq('user_id',uid);
       if(cv?.length)setCustomVenues(cv.map(c=>c.deleted?{id:c.venue_data?.id,deleted:true}:c.venue_data));
+
+      // рейтинги всех пользователей по заведениям
+      try{
+        const{data:allRatings}=await supabase.from('checkins').select('venue_id,rating').gt('rating',0);
+        if(allRatings?.length){
+          const sums={},counts={};
+          allRatings.forEach(c=>{
+            sums[c.venue_id]=(sums[c.venue_id]||0)+c.rating;
+            counts[c.venue_id]=(counts[c.venue_id]||0)+1;
+          });
+          const ratings={};
+          Object.keys(sums).forEach(id=>{
+            ratings[id]={avg:+(sums[id]/counts[id]).toFixed(1),count:counts[id]};
+          });
+          setVenueRatings(ratings);
+        }
+      }catch(e){}
 
       // одобренные фото меню
       try{
@@ -1029,7 +1047,7 @@ html,body,#root{height:100%;overflow:hidden}
               <div style={{padding:"12px 16px 6px"}}>
                 <div style={{fontSize:12,color:"var(--txt3)",marginBottom:8}}>📍 {sv.a}</div>
                 <div className="vp-tags">
-                  {mm==="city"&&sv.r>0&&<span className="vp-tag gold">★ {sv.r} · {sv.rc} отз.</span>}
+                  {mm==="city"&&venueRatings[sv.id]?.avg>0&&<span className="vp-tag gold">★ {venueRatings[sv.id].avg} · {venueRatings[sv.id].count} отз.</span>}
                   {mm==="my"&&(()=>{
                     const myRatings=myci.filter(c=>c.rating>0);
                     if(!myRatings.length)return null;
@@ -1214,7 +1232,7 @@ html,body,#root{height:100%;overflow:hidden}
                         <div className="vi-icon" style={{background:col.bg}}>{v.i}</div>
                         <div className="vi-info"><div className="vi-name">{v.n}</div><div className="vi-sub">{v.a}{v.s?` · ${v.s}`:""}</div></div>
                         <div className="vi-right">
-                          {mm==="city"&&v.r>0&&<div className="vi-rating">★ {v.r}</div>}
+                          {mm==="city"&&venueRatings[v.id]?.avg>0&&<div className="vi-rating">★ {venueRatings[v.id].avg}</div>}
                           {mm==="my"&&(()=>{const myR=checkins.filter(c=>c.venueId===v.id&&c.rating>0);if(!myR.length)return null;const avg=(myR.reduce((s,c)=>s+c.rating,0)/myR.length).toFixed(1);return<div className="vi-rating" style={{color:"var(--grn3)"}}>★ {avg}</div>;})()}
                           {visited&&<div className="vi-visited"/>}
                         </div>
@@ -1406,7 +1424,7 @@ html,body,#root{height:100%;overflow:hidden}
                         <div className="vi-sub">{v.a}{v.s?` · ${v.s}`:""}</div>
                       </div>
                       <div className="vi-right">
-                        {mm==="city"&&v.r>0&&<div className="vi-rating">★ {v.r}</div>}
+                        {mm==="city"&&venueRatings[v.id]?.avg>0&&<div className="vi-rating">★ {venueRatings[v.id].avg}</div>}
                         {mm==="my"&&(()=>{
                           const myR=checkins.filter(c=>c.venueId===v.id&&c.rating>0);
                           if(!myR.length)return null;
@@ -1569,7 +1587,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="vp-name">{sv.n}</div>
                   <div className="vp-addr">📍 {sv.a}</div>
                   <div className="vp-tags">
-                    {mm==="city"&&sv.r>0&&<span className="vp-tag gold">★ {sv.r} · {sv.rc} отз.</span>}
+                    {mm==="city"&&venueRatings[sv.id]?.avg>0&&<span className="vp-tag gold">★ {venueRatings[sv.id].avg} · {venueRatings[sv.id].count} отз.</span>}
                     {mm==="my"&&(()=>{
                       const myRatings=myci.filter(c=>c.rating>0);
                       if(myRatings.length===0)return null;
