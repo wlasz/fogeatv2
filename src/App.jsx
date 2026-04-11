@@ -933,8 +933,8 @@ html,body,#root{height:100%;overflow:hidden}
         <div className="success-overlay">
           <div className="success-card">
             <div style={{fontSize:54}}>{srType==="checkin"?"🎉":"✅"}</div>
-            <div className="success-xp">{srType==="checkin"?"+50 XP":"+20 XP"}</div>
-            <div style={{fontSize:13,color:"var(--txt2)",fontFamily:"'Nunito',sans-serif"}}>{srType==="checkin"?"Чекин сохранён!":"Посещение отмечено!"}</div>
+            <div className="success-xp">{srType==="checkin"?"+50 XP":srType==="menu"?"📋":"+ 20 XP"}</div>
+            <div style={{fontSize:13,color:"var(--txt2)",fontFamily:"'Nunito',sans-serif"}}>{srType==="checkin"?"Чекин сохранён!":srType==="menu"?"Фото отправлено на проверку":"Посещение отмечено!"}</div>
           </div>
         </div>
       )}
@@ -1858,7 +1858,8 @@ html,body,#root{height:100%;overflow:hidden}
                       const existing=menuPhotos[sv.id]||[];
                       const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
                       setMenuPhotos(updated);
-                      alert(`Фото отправлено на проверку (${newPhotos.length} шт.)`);
+                      setShowMenuModal(false);
+                      setSrType("menu");setSr(true);setTimeout(()=>setSr(false),2500);
                     }
                   }}/>
                 <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:`2px dashed ${menuUploading?"var(--gold)":"var(--border)"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:menuUploading?"var(--gold)":"var(--txt3)",fontSize:12,transition:"all .2s"}}>
