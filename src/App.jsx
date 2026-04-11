@@ -379,6 +379,11 @@ function FogEat({session}){
       const vl=await g(`fogeat-venuelabels-${uid}`);if(vl)setVenueLabels(vl);
     };
     load();
+
+    // обновляем данные когда пользователь возвращается на вкладку
+    const onVisible=()=>{if(document.visibilityState==="visible")load();};
+    document.addEventListener("visibilitychange",onVisible);
+    return()=>document.removeEventListener("visibilitychange",onVisible);
   },[]);
 
   const placeTempMarker=(lat,lng)=>{
