@@ -320,6 +320,7 @@ function FogEat({session}){
   const[menuPhotos,setMenuPhotos]=useState({});
   const[showMenuModal,setShowMenuModal]=useState(false);
   const[photoViewer,setPhotoViewer]=useState(null);
+  const[viewProfile,setViewProfile]=useState(null); // {userId, username}
   const[checkinPhotos,setCheckinPhotos]=useState({});
   const[venueNotes,setVenueNotes]=useState({});
   const[customLabels,setCustomLabels]=useState([]);   // [{id,name,emoji,color}]
@@ -558,9 +559,7 @@ function FogEat({session}){
     let photoKey=null;
     let photoUrl=null;
     if(checkinPhoto){
-      // конвертируем base64 в blob и загружаем в Supabase Storage
       try{
-        
         const res=await fetch(checkinPhoto);
         const blob=await res.blob();
         const path=`${venue.id}/${id}.jpg`;
@@ -579,6 +578,17 @@ function FogEat({session}){
       time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
       photoKey,photoUrl,
     };
+    // Сохраняем в Supabase таблицу
+    try{
+      await supabase.from('checkins').insert({
+        id,user_id:currentUser.id,
+        venue_id:venue.id,venue_name:venue.n,
+        dish:dishName||"Блюдо",rating:cr,review:reviewText,
+        price,date:now.toLocaleDateString("ru-RU"),
+        time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
+        photo_key:photoKey,photo_url:photoUrl,
+      });
+    }catch(e){}
     const updated=[newCheckin,...checkins];
     setCheckins(updated);
     saveCheckins(updated);
@@ -588,17 +598,27 @@ function FogEat({session}){
     setSrType("checkin");setSr(true);setTimeout(()=>setSr(false),2500);
   };
 
-  const doQuickVisit=()=>{
+  const doQuickVisit=async()=>{
     const venue=sv;
     if(!venue)return;
     const now=new Date();
+    const id=Date.now();
     const newCheckin={
-      id:Date.now(),venueId:venue.id,venueName:venue.n,
+      id,venueId:venue.id,venueName:venue.n,
       dish:"",rating:visitRating,review:visitNote,price:"",
       date:now.toLocaleDateString("ru-RU"),
       time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
       type:"visit",
     };
+    try{
+      await supabase.from('checkins').insert({
+        id,user_id:currentUser.id,
+        venue_id:venue.id,venue_name:venue.n,
+        dish:"",rating:visitRating,review:visitNote,price:"",
+        date:now.toLocaleDateString("ru-RU"),
+        time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
+      });
+    }catch(e){}
     const updated=[newCheckin,...checkins];
     setCheckins(updated);saveCheckins(updated);
     const newUser={...user,xp:user.xp+20,checkins:user.checkins+1};
@@ -675,7 +695,7 @@ function FogEat({session}){
     return{...activeStep,p:Math.min(p,activeStep.t),ok:p>=activeStep.t};
   });
 
-  const TAB_ICONS={map:"📍",wishlist:"📌",checkins:"✅",profile:"👤"};
+  const TAB_ICONS={map:"📍",wishlist:"📌",checkins:"✅",top:"🏆",profile:"👤"};
 
   return(<>
     <style>{`
@@ -1170,6 +1190,12 @@ html,body,#root{height:100%;overflow:hidden}
               </div>
             )}
 
+            {tab==="top"&&(
+              <div className="sc">
+                <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
+              </div>
+            )}
+
             {tab==="profile"&&(
               <div className="sc">
                 <div className="prof-hero">
@@ -1204,7 +1230,7 @@ html,body,#root{height:100%;overflow:hidden}
 
         {/* Фиксированный таббар снизу */}
         <div className="mob-tabs">
-          {[["map","📍","Места"],["wishlist","📌","Вишлист"],["checkins","✅","Чекины"],["profile","👤","Профиль"]].map(([k,ico,lbl])=>(
+          {[["map","📍","Места"],["wishlist","📌","Вишлист"],["checkins","✅","Чекины"],["top","🏆","Топ"],["profile","👤","Профиль"]].map(([k,ico,lbl])=>(
             <button key={k} className={`mob-tab ${tab===k?"a":""}`} onClick={()=>{setTab(k);if(!sheetOpen)setSheetOpen(true);}}>
               <span className="ico">{ico}</span>{lbl}
             </button>
@@ -1241,7 +1267,7 @@ html,body,#root{height:100%;overflow:hidden}
           <div className="tabs">
             {Object.entries(TAB_ICONS).map(([k,ico])=>(
               <button key={k} className={`tab-btn ${tab===k?"a":""}`} onClick={()=>setTab(k)}>
-                {ico}<span className="tab-lbl">{k==="map"?"Места":k==="wishlist"?"Вишлист":k==="checkins"?"Чекины":"Профиль"}</span>
+                {ico}<span className="tab-lbl">{k==="map"?"Места":k==="wishlist"?"Вишлист":k==="checkins"?"Чекины":k==="top"?"Топ":"Профиль"}</span>
               </button>
             ))}
           </div>
@@ -1369,6 +1395,13 @@ html,body,#root{height:100%;overflow:hidden}
                   }} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* TOP TAB */}
+          {tab==="top"&&(
+            <div className="sc">
+              <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
             </div>
           )}
 
@@ -2028,6 +2061,24 @@ html,body,#root{height:100%;overflow:hidden}
       </div>
     )}
 
+    {/* USER PROFILE VIEWER */}
+    {viewProfile&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:3000,display:"flex",alignItems:"flex-end"}}
+        onClick={()=>setViewProfile(null)}>
+        <div style={{width:"100%",maxHeight:"85vh",background:"var(--bg2)",borderRadius:"16px 16px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}
+          onClick={e=>e.stopPropagation()} {...(()=>({
+            onTouchStart:e=>{e.currentTarget._sx=e.touches[0].clientX;},
+            onTouchEnd:e=>{if(e.changedTouches[0].clientX-e.currentTarget._sx>80)setViewProfile(null);}
+          }))()}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+            <div style={{fontFamily:"'Dela Gothic One'",fontSize:16}}>@{viewProfile.username}</div>
+            <button onClick={()=>setViewProfile(null)} style={{background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer"}}>✕</button>
+          </div>
+          <UserCheckins userId={viewProfile.userId} username={viewProfile.username}/>
+        </div>
+      </div>
+    )}
+
     {/* MAP PLACEMENT HINT */}
     {placingMarker&&(
       <div style={{position:"fixed",top:70,left:"50%",transform:"translateX(-50%)",zIndex:2000,background:"rgba(232,168,56,.95)",color:"#1a1a0a",padding:"10px 20px",borderRadius:30,fontFamily:"'Nunito'",fontWeight:800,fontSize:13,pointerEvents:"none",boxShadow:"0 4px 16px rgba(0,0,0,.4)"}}>
@@ -2143,6 +2194,116 @@ function AdminPanel(){
           {allCheckins.length===0&&<div style={{textAlign:"center",padding:16,color:"var(--txt3)",fontSize:12}}>Нет чекинов</div>}
         </div>
       )}
+    </div>
+  );
+}
+
+function TopUsers({currentUserId,onViewProfile}){
+  const[users,setUsers]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[favorites,setFavorites]=useState([]);
+
+  useEffect(()=>{
+    const load=async()=>{
+      // загружаем топ пользователей по количеству чекинов
+      const{data:counts}=await supabase
+        .from('checkins')
+        .select('user_id')
+        .order('user_id');
+      
+      // считаем чекины по user_id
+      const countMap={};
+      (counts||[]).forEach(r=>{countMap[r.user_id]=(countMap[r.user_id]||0)+1;});
+      
+      // загружаем профили
+      const{data:profiles}=await supabase.from('profiles').select('id,username,role');
+      
+      const ranked=(profiles||[])
+        .map(p=>({...p,count:countMap[p.id]||0}))
+        .sort((a,b)=>b.count-a.count);
+      setUsers(ranked);
+
+      // загружаем избранных
+      if(currentUserId){
+        const{data:favs}=await supabase.from('favorites').select('favorite_user_id').eq('user_id',currentUserId);
+        setFavorites((favs||[]).map(f=>f.favorite_user_id));
+      }
+      setLoading(false);
+    };
+    load();
+  },[currentUserId]);
+
+  const toggleFavorite=async(userId)=>{
+    if(!currentUserId||userId===currentUserId)return;
+    if(favorites.includes(userId)){
+      await supabase.from('favorites').delete().eq('user_id',currentUserId).eq('favorite_user_id',userId);
+      setFavorites(f=>f.filter(id=>id!==userId));
+    } else {
+      await supabase.from('favorites').insert({user_id:currentUserId,favorite_user_id:userId});
+      setFavorites(f=>[...f,userId]);
+    }
+  };
+
+  if(loading)return<div style={{textAlign:"center",padding:32,color:"var(--txt3)",fontSize:12}}>Загрузка...</div>;
+
+  return(
+    <div>
+      <div className="sec-hdr">🏆 Топ исследователей</div>
+      {users.map((u,i)=>(
+        <div key={u.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:"1px solid var(--border)",cursor:"pointer"}}
+          onClick={()=>onViewProfile({userId:u.id,username:u.username})}>
+          <div style={{width:28,height:28,borderRadius:"50%",background:i===0?"#e8a838":i===1?"#9a9480":i===2?"#8b6914":"var(--bg3)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Dela Gothic One'",fontSize:12,color:i<3?"#090c08":"var(--txt3)",flexShrink:0}}>
+            {i+1}
+          </div>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"var(--grn)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Dela Gothic One'",fontSize:16,color:"#fff",flexShrink:0}}>
+            {(u.username||"?")[0].toUpperCase()}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:"var(--txt)"}}>@{u.username||"—"}</div>
+            <div style={{fontSize:10,color:"var(--txt3)"}}>{u.count} чекинов</div>
+          </div>
+          {currentUserId&&u.id!==currentUserId&&(
+            <button onClick={e=>{e.stopPropagation();toggleFavorite(u.id);}}
+              style={{padding:"4px 10px",borderRadius:8,border:`1px solid ${favorites.includes(u.id)?"var(--gold)":"var(--border)"}`,background:favorites.includes(u.id)?"rgba(232,168,56,.15)":"none",color:favorites.includes(u.id)?"var(--gold)":"var(--txt3)",fontSize:10,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'",flexShrink:0}}>
+              {favorites.includes(u.id)?"★ Избранное":"☆ В избранное"}
+            </button>
+          )}
+        </div>
+      ))}
+      {users.length===0&&<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Пока нет пользователей</div>}
+    </div>
+  );
+}
+
+function UserCheckins({userId,username}){
+  const[checkins,setCheckins]=useState([]);
+  const[loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    supabase.from('checkins').select('*').eq('user_id',userId).order('created_at',{ascending:false})
+      .then(({data})=>{setCheckins(data||[]);setLoading(false);});
+  },[userId]);
+
+  if(loading)return<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Загрузка...</div>;
+
+  return(
+    <div style={{overflowY:"auto",flex:1}}>
+      <div style={{padding:"8px 14px 4px",fontSize:11,color:"var(--txt3)"}}>
+        {checkins.length} чекинов
+      </div>
+      {checkins.map((c,i)=>(
+        <div key={i} style={{padding:"10px 14px",borderBottom:"1px solid var(--border)"}}>
+          {c.photo_url&&<img src={c.photo_url} alt="" style={{width:"100%",height:140,objectFit:"cover",borderRadius:8,marginBottom:8}}/>}
+          <div style={{fontWeight:800,fontSize:13,color:"var(--txt)"}}>{c.venue_name}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center",marginTop:3}}>
+            {c.rating>0&&<span style={{color:"var(--gold)",fontSize:11}}>★ {c.rating}</span>}
+            {c.dish&&<span style={{fontSize:10,color:"var(--txt2)"}}>{c.dish}</span>}
+            <span style={{fontSize:10,color:"var(--txt3)"}}>{c.date}</span>
+          </div>
+          {c.review&&<div style={{fontSize:11,color:"var(--txt2)",marginTop:4,fontStyle:"italic"}}>«{c.review}»</div>}
+        </div>
+      ))}
+      {checkins.length===0&&<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Нет чекинов</div>}
     </div>
   );
 }
