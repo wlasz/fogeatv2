@@ -319,6 +319,7 @@ function FogEat({session}){
   const[selectedVenueForCheckin,setSelectedVenueForCheckin]=useState(null);
   const[menuPhotos,setMenuPhotos]=useState({});
   const[showMenuModal,setShowMenuModal]=useState(false);
+  const[menuUploading,setMenuUploading]=useState(false);
   const[photoViewer,setPhotoViewer]=useState(null);
   const[viewProfile,setViewProfile]=useState(null); // {userId, username}
   const[checkinPhotos,setCheckinPhotos]=useState({});
@@ -1813,7 +1814,6 @@ html,body,#root{height:100%;overflow:hidden}
 
     {/* MENU PHOTO MODAL */}
     {showMenuModal&&sv&&(()=>{
-      const[uploading,setUploading]=useState(false);
       const MENU_EMOJIS=["📄","📃","📜","🗒️","📋","🖼️","📷","🍽️","🥘","🍱"];
       const addMenuPhoto=(emoji)=>{
         const now=new Date();
@@ -1839,7 +1839,7 @@ html,body,#root{height:100%;overflow:hidden}
                   onChange={async e=>{
                     const files=Array.from(e.target.files);
                     if(!files.length)return;
-                    setUploading(true);
+                    setMenuUploading(true);
                     const now=new Date();
                     const newPhotos=[];
                     for(const file of files){
@@ -1853,7 +1853,7 @@ html,body,#root{height:100%;overflow:hidden}
                       }).select().single();
                       newPhotos.push({src:data.publicUrl,path,id:row?.id,date:now.toLocaleDateString("ru-RU"),status:'pending'});
                     }
-                    setUploading(false);
+                    setMenuUploading(false);
                     if(newPhotos.length){
                       const existing=menuPhotos[sv.id]||[];
                       const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
@@ -1861,8 +1861,8 @@ html,body,#root{height:100%;overflow:hidden}
                       alert(`Фото отправлено на проверку (${newPhotos.length} шт.)`);
                     }
                   }}/>
-                <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:`2px dashed ${uploading?"var(--gold)":"var(--border)"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:uploading?"var(--gold)":"var(--txt3)",fontSize:12,transition:"all .2s"}}>
-                  {uploading?(
+                <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:`2px dashed ${menuUploading?"var(--gold)":"var(--border)"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:menuUploading?"var(--gold)":"var(--txt3)",fontSize:12,transition:"all .2s"}}>
+                  {menuUploading?(
                     <>
                       <div style={{width:28,height:28,border:"3px solid var(--gold)",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
                       <span>Загрузка...</span>
