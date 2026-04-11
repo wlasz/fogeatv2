@@ -713,6 +713,7 @@ function FogEat({session}){
     <style>{`
 @keyframes splashFade{0%{opacity:1;pointer-events:all}80%{opacity:1}100%{opacity:0;pointer-events:none}}
 @keyframes splashPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+@keyframes spin{to{transform:rotate(360deg)}}
 :root{
   --bg:#090c08;--bg2:#0f1410;--bg3:#1a201a;--card:#141a14;
   --gold:#e8a838;--gold2:#ffc857;--gold3:#fff0c0;
@@ -1812,6 +1813,7 @@ html,body,#root{height:100%;overflow:hidden}
 
     {/* MENU PHOTO MODAL */}
     {showMenuModal&&sv&&(()=>{
+      const[uploading,setUploading]=useState(false);
       const MENU_EMOJIS=["📄","📃","📜","🗒️","📋","🖼️","📷","🍽️","🥘","🍱"];
       const addMenuPhoto=(emoji)=>{
         const now=new Date();
@@ -1837,6 +1839,7 @@ html,body,#root{height:100%;overflow:hidden}
                   onChange={async e=>{
                     const files=Array.from(e.target.files);
                     if(!files.length)return;
+                    setUploading(true);
                     const now=new Date();
                     const newPhotos=[];
                     for(const file of files){
@@ -1844,13 +1847,13 @@ html,body,#root{height:100%;overflow:hidden}
                       const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
                       if(error){alert(`Ошибка загрузки: ${error.message}`);continue;}
                       const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
-                      // сохраняем в таблицу со статусом pending
                       const{data:row}=await supabase.from('menu_photos').insert({
                         venue_id:sv.id,user_id:currentUser?.id,
                         photo_url:data.publicUrl,photo_path:path,status:'pending'
                       }).select().single();
                       newPhotos.push({src:data.publicUrl,path,id:row?.id,date:now.toLocaleDateString("ru-RU"),status:'pending'});
                     }
+                    setUploading(false);
                     if(newPhotos.length){
                       const existing=menuPhotos[sv.id]||[];
                       const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
@@ -1858,11 +1861,18 @@ html,body,#root{height:100%;overflow:hidden}
                       alert(`Фото отправлено на проверку (${newPhotos.length} шт.)`);
                     }
                   }}/>
-                <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"var(--txt3)",fontSize:12,transition:"all .2s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--gold)";e.currentTarget.style.color="var(--gold)"}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--border)";e.currentTarget.style.color="var(--txt3)"}}>
-                  <span style={{fontSize:30}}>📷</span>
-                  <span>Добавить фото (можно несколько)</span>
+                <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:`2px dashed ${uploading?"var(--gold)":"var(--border)"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:uploading?"var(--gold)":"var(--txt3)",fontSize:12,transition:"all .2s"}}>
+                  {uploading?(
+                    <>
+                      <div style={{width:28,height:28,border:"3px solid var(--gold)",borderTopColor:"transparent",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                      <span>Загрузка...</span>
+                    </>
+                  ):(
+                    <>
+                      <span style={{fontSize:30}}>📷</span>
+                      <span>Добавить фото (можно несколько)</span>
+                    </>
+                  )}
                 </div>
               </label>
               {menuPhotos[sv.id]?.length>0&&<>
