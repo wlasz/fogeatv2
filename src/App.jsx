@@ -336,7 +336,7 @@ function FogEat({session}){
   const[showAddVenue,setShowAddVenue]=useState(false);
   const[customVenues,setCustomVenues]=useState([]);
   const[venueRatings,setVenueRatings]=useState({}); // {venueId: {avg, count}}
-  const[sortBy,setSortBy]=useState("default"); // default | rating_desc | rating_asc
+  const[sortBy,setSortBy]=useState("rating_desc"); // default | rating_desc | rating_asc
   const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
   const[geoSearch,setGeoSearch]=useState("");
   const[geoLoading,setGeoLoading]=useState(false);
