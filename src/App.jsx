@@ -352,14 +352,32 @@ function FogEat({session}){
         if(data?.role==='admin')setIsAdmin(true);
         if(data?.username)setUser(u=>({...u,name:data.username}));
       }
-      const checkins=await g(`fogeat-checkins-${uid}`);if(checkins)setCheckins(checkins);
-      const wv=await g(`fogeat-wishvenues-${uid}`);if(wv)setWishVenues(wv);
-      const wd=await g(`fogeat-wishdishes-${uid}`);if(wd)setWishDishes(wd);
-      const u=await g(`fogeat-user-${uid}`);
-      if(u){if(u.checkins>0||u.xp>0){try{await storage.delete(`fogeat-user-${uid}`);}catch(e){}}else{setUser(u);}}
-      try{await storage.delete("fogeat-achs");}catch(e){}
-      const mp=await g(`fogeat-menuphotos-${uid}`);if(mp)setMenuPhotos(mp); // legacy
-      // загружаем одобренные фото меню из таблицы
+
+      // чекины из таблицы
+      const{data:ck}=await supabase.from('checkins').select('*').eq('user_id',uid).order('created_at',{ascending:false});
+      if(ck?.length)setCheckins(ck.map(c=>({id:c.id,venueId:c.venue_id,venueName:c.venue_name,dish:c.dish,rating:c.rating,review:c.review,price:c.price,date:c.date,time:c.time,photoKey:c.photo_key,photoUrl:c.photo_url})));
+
+      // вишлист из таблицы
+      const{data:wv}=await supabase.from('wishlist').select('*').eq('user_id',uid).order('created_at',{ascending:false});
+      if(wv?.length)setWishVenues(wv.map(w=>({id:w.venue_id,n:w.venue_name,c:w.venue_icon})));
+
+      // заметки из таблицы
+      const{data:vn}=await supabase.from('venue_notes').select('*').eq('user_id',uid);
+      if(vn?.length){const notes={};vn.forEach(n=>{notes[n.venue_id]=n.note;});setVenueNotes(notes);}
+
+      // теги из таблицы
+      const{data:cl}=await supabase.from('venue_labels').select('*').eq('user_id',uid);
+      if(cl?.length)setCustomLabels(cl.map(l=>({id:l.label_id,name:l.label_name,emoji:l.label_emoji,color:l.label_color})));
+
+      // назначения тегов из таблицы
+      const{data:vl}=await supabase.from('venue_label_assignments').select('*').eq('user_id',uid);
+      if(vl?.length){const labels={};vl.forEach(a=>{if(!labels[a.venue_id])labels[a.venue_id]=[];labels[a.venue_id].push(a.label_id);});setVenueLabels(labels);}
+
+      // кастомные заведения из таблицы
+      const{data:cv}=await supabase.from('custom_venues').select('*').eq('user_id',uid);
+      if(cv?.length)setCustomVenues(cv.map(c=>c.deleted?{id:c.venue_data?.id,deleted:true}:c.venue_data));
+
+      // одобренные фото меню
       try{
         const{data:approvedPhotos}=await supabase.from('menu_photos').select('*').eq('status','approved');
         if(approvedPhotos?.length){
@@ -371,12 +389,6 @@ function FogEat({session}){
           setMenuPhotos(prev=>({...prev,...grouped}));
         }
       }catch(e){}
-      const cv=await g(`fogeat-customvenues-${uid}`);if(cv)setCustomVenues(cv);
-      // резервный список удалённых ID
-      if(!cv){const del=await g(`fogeat-deleted-${uid}`);if(del&&del.length)setCustomVenues(del.map(id=>({id,deleted:true})));}
-      const vn=await g(`fogeat-venuenotes-${uid}`);if(vn)setVenueNotes(vn);
-      const cl=await g(`fogeat-customlabels-${uid}`);if(cl)setCustomLabels(cl);
-      const vl=await g(`fogeat-venuelabels-${uid}`);if(vl)setVenueLabels(vl);
     };
     load();
 
@@ -404,20 +416,45 @@ function FogEat({session}){
 
 
 
-  const saveMenuPhotos=async(data)=>{try{await storage.set(`fogeat-menuphotos-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveVenueNotes=async(data)=>{try{await storage.set(`fogeat-venuenotes-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveCustomLabels=async(data)=>{try{await storage.set(`fogeat-customlabels-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveVenueLabels=async(data)=>{try{await storage.set(`fogeat-venuelabels-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveMenuPhotos=async()=>{}; // теперь через menu_photos таблицу
 
-  const saveCheckins=async(data)=>{try{await storage.set(`fogeat-checkins-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveWishVenues=async(data)=>{try{await storage.set(`fogeat-wishvenues-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveWishDishes=async(data)=>{try{await storage.set(`fogeat-wishdishes-${uid}`,JSON.stringify(data));}catch(e){}};
-  const saveUser=async(data)=>{try{await storage.set(`fogeat-user-${uid}`,JSON.stringify(data));}catch(e){}};
+  const saveVenueNotes=async(data)=>{
+    // data = {venueId: note}
+    for(const[venueId,note] of Object.entries(data)){
+      await supabase.from('venue_notes').upsert({user_id:uid,venue_id:parseInt(venueId),note,updated_at:new Date().toISOString()},{onConflict:'user_id,venue_id'});
+    }
+  };
+
+  const saveCustomLabels=async(data)=>{
+    await supabase.from('venue_labels').delete().eq('user_id',uid);
+    if(data.length)await supabase.from('venue_labels').insert(data.map(l=>({user_id:uid,label_id:l.id,label_name:l.name,label_emoji:l.emoji,label_color:l.color})));
+  };
+
+  const saveVenueLabels=async(data)=>{
+    await supabase.from('venue_label_assignments').delete().eq('user_id',uid);
+    const rows=[];
+    for(const[venueId,labelIds] of Object.entries(data)){
+      labelIds.forEach(lid=>rows.push({user_id:uid,venue_id:parseInt(venueId),label_id:lid}));
+    }
+    if(rows.length)await supabase.from('venue_label_assignments').insert(rows);
+  };
+
+  const saveCheckins=async()=>{}; // теперь через checkins таблицу
+
+  const saveWishVenues=async(data)=>{
+    await supabase.from('wishlist').delete().eq('user_id',uid);
+    if(data.length)await supabase.from('wishlist').insert(data.map(w=>({user_id:uid,venue_id:w.id,venue_name:w.n,venue_icon:w.c})));
+  };
+
+  const saveWishDishes=async()=>{}; // пока не мигрировано
+
+  const saveUser=async()=>{}; // XP/уровень пока в памяти
+
   const saveCustomVenues=async(data)=>{
-    try{await storage.set(`fogeat-customvenues-${uid}`,JSON.stringify(data));}catch(e){}
-    // дополнительно сохраняем список удалённых ID отдельно
-    const delIds=data.filter(v=>v.deleted).map(v=>v.id);
-    try{await storage.set(`fogeat-deleted-${uid}`,JSON.stringify(delIds));}catch(e){}
+    await supabase.from('custom_venues').delete().eq('user_id',uid);
+    if(data.length)await supabase.from('custom_venues').insert(
+      data.map(v=>({user_id:uid,venue_data:v.deleted?{id:v.id}:v,deleted:!!v.deleted}))
+    );
   };
 
   // загружаем фото чекинов когда открывается панель заведения
@@ -1069,7 +1106,7 @@ html,body,#root{height:100%;overflow:hidden}
                     {c.review&&<div className="ci-review">«{c.review}»</div>}
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',c.id);const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
                           style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
@@ -1195,7 +1232,7 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:4,flexShrink:0}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);saveCheckins(u);setConfirmDeleteCheckin(null);}}
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',c.id);const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setConfirmDeleteCheckin(null);}}
                           style={{width:40,height:20,borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,cursor:"pointer"}}>да</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{width:40,height:20,borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,cursor:"pointer"}}>нет</button>
