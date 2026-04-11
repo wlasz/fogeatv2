@@ -357,7 +357,19 @@ function FogEat({session}){
       const u=await g(`fogeat-user-${uid}`);
       if(u){if(u.checkins>0||u.xp>0){try{await storage.delete(`fogeat-user-${uid}`);}catch(e){}}else{setUser(u);}}
       try{await storage.delete("fogeat-achs");}catch(e){}
-      const mp=await g(`fogeat-menuphotos-${uid}`);if(mp)setMenuPhotos(mp);
+      const mp=await g(`fogeat-menuphotos-${uid}`);if(mp)setMenuPhotos(mp); // legacy
+      // загружаем одобренные фото меню из таблицы
+      try{
+        const{data:approvedPhotos}=await supabase.from('menu_photos').select('*').eq('status','approved');
+        if(approvedPhotos?.length){
+          const grouped={};
+          approvedPhotos.forEach(p=>{
+            if(!grouped[p.venue_id])grouped[p.venue_id]=[];
+            grouped[p.venue_id].push({src:p.photo_url,path:p.photo_path,id:p.id,date:new Date(p.created_at).toLocaleDateString('ru-RU')});
+          });
+          setMenuPhotos(prev=>({...prev,...grouped}));
+        }
+      }catch(e){}
       const cv=await g(`fogeat-customvenues-${uid}`);if(cv)setCustomVenues(cv);
       // резервный список удалённых ID
       if(!cv){const del=await g(`fogeat-deleted-${uid}`);if(del&&del.length)setCustomVenues(del.map(id=>({id,deleted:true})));}
@@ -1832,14 +1844,18 @@ html,body,#root{height:100%;overflow:hidden}
                       const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
                       if(error){alert(`Ошибка загрузки: ${error.message}`);continue;}
                       const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
-                      newPhotos.push({src:data.publicUrl,path,date:now.toLocaleDateString("ru-RU"),time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`});
+                      // сохраняем в таблицу со статусом pending
+                      const{data:row}=await supabase.from('menu_photos').insert({
+                        venue_id:sv.id,user_id:currentUser?.id,
+                        photo_url:data.publicUrl,photo_path:path,status:'pending'
+                      }).select().single();
+                      newPhotos.push({src:data.publicUrl,path,id:row?.id,date:now.toLocaleDateString("ru-RU"),status:'pending'});
                     }
                     if(newPhotos.length){
                       const existing=menuPhotos[sv.id]||[];
                       const updated={...menuPhotos,[sv.id]:[...existing,...newPhotos]};
-                      setMenuPhotos(updated);saveMenuPhotos(updated);
-                    } else if(!files.every((_,i)=>i===0)){
-                      alert('Ни одно фото не загрузилось');
+                      setMenuPhotos(updated);
+                      alert(`Фото отправлено на проверку (${newPhotos.length} шт.)`);
                     }
                   }}/>
                 <div style={{width:"100%",height:110,borderRadius:10,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"var(--txt3)",fontSize:12,transition:"all .2s"}}
@@ -2096,6 +2112,7 @@ function AdminPanel(){
   const[adminTab,setAdminTab]=useState("users");
   const[users,setUsers]=useState([]);
   const[allCheckins,setAllCheckins]=useState([]);
+  const[pendingMenus,setPendingMenus]=useState([]);
   const[loading,setLoading]=useState(false);
 
   useEffect(()=>{
@@ -2120,7 +2137,22 @@ function AdminPanel(){
       });
       setAllCheckins(all.sort((a,b)=>b.id-a.id));
     }
+    if(adminTab==="menu"){
+      const{data}=await supabase.from('menu_photos').select('*').eq('status','pending').order('created_at',{ascending:false});
+      setPendingMenus(data||[]);
+    }
     setLoading(false);
+  };
+
+  const approveMenu=async(photo)=>{
+    await supabase.from('menu_photos').update({status:'approved'}).eq('id',photo.id);
+    setPendingMenus(p=>p.filter(m=>m.id!==photo.id));
+  };
+
+  const rejectMenu=async(photo)=>{
+    await supabase.storage.from('menu-photos').remove([photo.photo_path]);
+    await supabase.from('menu_photos').delete().eq('id',photo.id);
+    setPendingMenus(p=>p.filter(m=>m.id!==photo.id));
   };
 
   const deleteCheckin=async(checkin)=>{
@@ -2143,7 +2175,7 @@ function AdminPanel(){
     <div style={{marginTop:16}}>
       <div className="sec-hdr" style={{color:"#e8a838"}}>⚙️ Панель администратора</div>
       <div style={{display:"flex",gap:0,margin:"8px 14px",background:"var(--bg3)",borderRadius:10,padding:3}}>
-        {[["users","👥 Пользователи"],["checkins","📸 Чекины"]].map(([k,l])=>(
+        {[["users","👥 Пользователи"],["checkins","📸 Чекины"],["menu","🍽️ Меню"]].map(([k,l])=>(
           <button key={k} onClick={()=>setAdminTab(k)}
             style={{flex:1,padding:"6px",borderRadius:8,border:"none",background:adminTab===k?"var(--grn)":"transparent",color:adminTab===k?"#fff":"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
             {l}
@@ -2196,6 +2228,30 @@ function AdminPanel(){
             </div>
           ))}
           {allCheckins.length===0&&<div style={{textAlign:"center",padding:16,color:"var(--txt3)",fontSize:12}}>Нет чекинов</div>}
+        </div>
+      )}
+
+      {!loading&&adminTab==="menu"&&(
+        <div style={{padding:"0 14px"}}>
+          {pendingMenus.length===0&&<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Нет фото на проверке 🎉</div>}
+          {pendingMenus.map(photo=>(
+            <div key={photo.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>
+                Заведение ID: {photo.venue_id} · {new Date(photo.created_at).toLocaleDateString("ru-RU")}
+              </div>
+              <img src={photo.photo_url} alt="" style={{width:"100%",borderRadius:8,marginBottom:8,maxHeight:300,objectFit:"contain",background:"var(--bg3)"}}/>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>approveMenu(photo)}
+                  style={{flex:1,padding:8,borderRadius:8,border:"none",background:"var(--grn)",color:"#fff",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                  ✓ Одобрить
+                </button>
+                <button onClick={()=>rejectMenu(photo)}
+                  style={{flex:1,padding:8,borderRadius:8,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                  ✗ Отклонить
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
