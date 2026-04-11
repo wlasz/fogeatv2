@@ -1192,7 +1192,17 @@ html,body,#root{height:100%;overflow:hidden}
 
             {tab==="top"&&(
               <div className="sc">
-                <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
+                {viewProfile?(
+                  <>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+                      <button onClick={()=>setViewProfile(null)} style={{background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",padding:"0 4px"}}>‹</button>
+                      <div style={{fontFamily:"'Dela Gothic One'",fontSize:15}}>@{viewProfile.username}</div>
+                    </div>
+                    <UserCheckins userId={viewProfile.userId}/>
+                  </>
+                ):(
+                  <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
+                )}
               </div>
             )}
 
@@ -1401,7 +1411,17 @@ html,body,#root{height:100%;overflow:hidden}
           {/* TOP TAB */}
           {tab==="top"&&(
             <div className="sc">
-              <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
+              {viewProfile?(
+                <>
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
+                    <button onClick={()=>setViewProfile(null)} style={{background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer",padding:"0 4px"}}>‹</button>
+                    <div style={{fontFamily:"'Dela Gothic One'",fontSize:15}}>@{viewProfile.username}</div>
+                  </div>
+                  <UserCheckins userId={viewProfile.userId}/>
+                </>
+              ):(
+                <TopUsers currentUserId={currentUser?.id} onViewProfile={setViewProfile}/>
+              )}
             </div>
           )}
 
@@ -2061,23 +2081,7 @@ html,body,#root{height:100%;overflow:hidden}
       </div>
     )}
 
-    {/* USER PROFILE VIEWER */}
-    {viewProfile&&(
-      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",zIndex:3000,display:"flex",alignItems:"flex-end"}}
-        onClick={()=>setViewProfile(null)}>
-        <div style={{width:"100%",maxHeight:"85vh",background:"var(--bg2)",borderRadius:"16px 16px 0 0",overflow:"hidden",display:"flex",flexDirection:"column"}}
-          onClick={e=>e.stopPropagation()} {...(()=>({
-            onTouchStart:e=>{e.currentTarget._sx=e.touches[0].clientX;},
-            onTouchEnd:e=>{if(e.changedTouches[0].clientX-e.currentTarget._sx>80)setViewProfile(null);}
-          }))()}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid var(--border)",flexShrink:0}}>
-            <div style={{fontFamily:"'Dela Gothic One'",fontSize:16}}>@{viewProfile.username}</div>
-            <button onClick={()=>setViewProfile(null)} style={{background:"none",border:"none",color:"var(--txt2)",fontSize:20,cursor:"pointer"}}>✕</button>
-          </div>
-          <UserCheckins userId={viewProfile.userId} username={viewProfile.username}/>
-        </div>
-      </div>
-    )}
+    {/* USER PROFILE VIEWER - inline in sidebar, not modal */}
 
     {/* MAP PLACEMENT HINT */}
     {placingMarker&&(
