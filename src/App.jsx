@@ -336,6 +336,7 @@ function FogEat({session}){
   const[showAddVenue,setShowAddVenue]=useState(false);
   const[customVenues,setCustomVenues]=useState([]);
   const[venueRatings,setVenueRatings]=useState({}); // {venueId: {avg, count}}
+  const[sortBy,setSortBy]=useState("default"); // default | rating_desc | rating_asc
   const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
   const[geoSearch,setGeoSearch]=useState("");
   const[geoLoading,setGeoLoading]=useState(false);
@@ -561,6 +562,10 @@ function FogEat({session}){
       return (venueLabels[String(v.id)]||[]).includes(lblId)&&sm;
     }
     return catMatch(v.c,cf)&&sm;
+  }).sort((a,b)=>{
+    if(sortBy==="rating_desc"){const ra=venueRatings[a.id]?.avg||0,rb=venueRatings[b.id]?.avg||0;return rb-ra;}
+    if(sortBy==="rating_asc"){const ra=venueRatings[a.id]?.avg||0,rb=venueRatings[b.id]?.avg||0;return ra-rb;}
+    return 0;
   });
 
   const mapVenues=allVenues.filter(v=>{
@@ -1220,7 +1225,13 @@ html,body,#root{height:100%;overflow:hidden}
                 </div>
                 <div style={{padding:"2px 12px 4px",fontSize:9,color:"var(--txt3)",fontWeight:700,display:"flex",justifyContent:"space-between"}}>
                   <span>{fl.length} заведений</span>
-                  <button onClick={()=>setShowAddVenue(true)} style={{padding:"2px 8px",borderRadius:6,background:"var(--grn)",color:"#fff",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>+ Добавить</button>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>setSortBy(s=>s==="rating_desc"?"rating_asc":s==="rating_asc"?"default":"rating_desc")}
+                      style={{padding:"2px 8px",borderRadius:6,background:sortBy!=="default"?"var(--gold)":"var(--bg3)",color:sortBy!=="default"?"var(--bg)":"var(--txt3)",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                      {sortBy==="rating_desc"?"★ ↓":sortBy==="rating_asc"?"★ ↑":"★ —"}
+                    </button>
+                    <button onClick={()=>setShowAddVenue(true)} style={{padding:"2px 8px",borderRadius:6,background:"var(--grn)",color:"#fff",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>+ Добавить</button>
+                  </div>
                 </div>
                 <div className="sc">
                   {fl.map(v=>{
@@ -1409,7 +1420,13 @@ html,body,#root{height:100%;overflow:hidden}
               </div>
               <div style={{padding:"5px 12px 4px",fontSize:9,color:"var(--txt3)",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <span>{fl.length} {mm==="my"?"посещено":"заведений"}</span>
-                <button onClick={()=>setShowAddVenue(true)} style={{padding:"2px 8px",borderRadius:6,background:"var(--grn)",color:"#fff",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>+ Добавить</button>
+                <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <button onClick={()=>setSortBy(s=>s==="rating_desc"?"rating_asc":s==="rating_asc"?"default":"rating_desc")}
+                    style={{padding:"2px 8px",borderRadius:6,background:sortBy!=="default"?"var(--gold)":"var(--bg3)",color:sortBy!=="default"?"var(--bg)":"var(--txt3)",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                    {sortBy==="rating_desc"?"★ ↓":sortBy==="rating_asc"?"★ ↑":"★ —"}
+                  </button>
+                  <button onClick={()=>setShowAddVenue(true)} style={{padding:"2px 8px",borderRadius:6,background:"var(--grn)",color:"#fff",border:"none",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>+ Добавить</button>
+                </div>
               </div>
               <div className="sc">
                 {fl.map(v=>{
