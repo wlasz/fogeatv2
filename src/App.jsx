@@ -1512,9 +1512,10 @@ html,body,#root{height:100%;overflow:hidden}
                     {c.review&&<div className="ck-review">«{c.review}»</div>}
                   </div>
                   <button onClick={async()=>{
-                    if(c.photoKey){try{const{supabase}=await import("./lib/storage.js");await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
+                    if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
+                    await supabase.from('checkins').delete().eq('id',parseInt(c.id));
                     const updated=checkins.filter(ch=>ch.id!==c.id);
-                    setCheckins(updated);saveCheckins(updated);
+                    setCheckins(updated);
                   }} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
                 </div>
               ))}
@@ -1780,8 +1781,9 @@ html,body,#root{height:100%;overflow:hidden}
                         <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
                           <button onClick={async()=>{
                             if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
+                            await supabase.from('checkins').delete().eq('id',parseInt(c.id));
                             const updated=checkins.filter(ch=>ch.id!==c.id);
-                            setCheckins(updated);saveCheckins(updated);
+                            setCheckins(updated);
                             setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
                             setConfirmDeleteCheckin(null);
                           }} style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
