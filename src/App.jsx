@@ -1128,7 +1128,7 @@ html,body,#root{height:100%;overflow:hidden}
                     {c.review&&<div className="ci-review">«{c.review}»</div>}
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',c.id);const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',parseInt(c.id));const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
                           style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
@@ -1254,7 +1254,7 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:4,flexShrink:0}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',c.id);const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setConfirmDeleteCheckin(null);}}
+                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',parseInt(c.id));const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setConfirmDeleteCheckin(null);}}
                           style={{width:40,height:20,borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,cursor:"pointer"}}>да</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{width:40,height:20,borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,cursor:"pointer"}}>нет</button>
