@@ -419,9 +419,21 @@ function FogEat({session}){
   const saveMenuPhotos=async()=>{}; // теперь через menu_photos таблицу
 
   const saveVenueNotes=async(data)=>{
-    // data = {venueId: note}
     for(const[venueId,note] of Object.entries(data)){
-      await supabase.from('venue_notes').upsert({user_id:uid,venue_id:parseInt(venueId),note,updated_at:new Date().toISOString()},{onConflict:'user_id,venue_id'});
+      if(note){
+        await supabase.from('venue_notes').upsert({user_id:uid,venue_id:parseInt(venueId),note,updated_at:new Date().toISOString()},{onConflict:'user_id,venue_id'});
+      } else {
+        await supabase.from('venue_notes').delete().eq('user_id',uid).eq('venue_id',parseInt(venueId));
+      }
+    }
+    // удаляем записи которых нет в data
+    const{data:existing}=await supabase.from('venue_notes').select('venue_id').eq('user_id',uid);
+    if(existing){
+      for(const row of existing){
+        if(data[row.venue_id]===undefined){
+          await supabase.from('venue_notes').delete().eq('user_id',uid).eq('venue_id',row.venue_id);
+        }
+      }
     }
   };
 
@@ -1063,9 +1075,19 @@ html,body,#root{height:100%;overflow:hidden}
               )}
               <div style={{padding:"0 14px 10px"}}>
                 <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:5,textTransform:"uppercase"}}>📝 Заметка</div>
-                <textarea value={venueNotes[sv.id]||""} onChange={e=>{const u={...venueNotes,[sv.id]:e.target.value};setVenueNotes(u);saveVenueNotes(u);}}
+                <textarea value={venueNotes[sv.id]||""} onChange={e=>{setVenueNotes(u=>({...u,[sv.id]:e.target.value}));}}
                   placeholder="Общее впечатление..." rows={3}
                   style={{width:"100%",padding:"9px 11px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:10,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none",resize:"none"}}/>
+                <div style={{display:"flex",gap:6,marginTop:6}}>
+                  <button onClick={()=>{const u={...venueNotes,[sv.id]:venueNotes[sv.id]||""};setVenueNotes(u);saveVenueNotes(u);}}
+                    style={{flex:1,padding:"6px",borderRadius:8,border:"none",background:"var(--grn)",color:"#fff",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
+                    💾 Сохранить
+                  </button>
+                  {venueNotes[sv.id]&&<button onClick={()=>{const u={...venueNotes};delete u[sv.id];setVenueNotes(u);saveVenueNotes(u);}}
+                    style={{padding:"6px 10px",borderRadius:8,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
+                    🗑
+                  </button>}
+                </div>
               </div>
               <div style={{padding:"0 14px 8px"}}>
                 <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid var(--grn2)",background:"rgba(90,156,53,.12)",color:"var(--grn3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
@@ -1606,9 +1628,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <textarea
                     value={venueNotes[sv.id]||""}
                     onChange={e=>{
-                      const updated={...venueNotes,[sv.id]:e.target.value};
-                      setVenueNotes(updated);
-                      saveVenueNotes(updated);
+                      setVenueNotes(u=>({...u,[sv.id]:e.target.value}));
                     }}
                     placeholder="Общее впечатление, что попробовать, с кем прийти..."
                     rows={3}
@@ -1616,6 +1636,16 @@ html,body,#root{height:100%;overflow:hidden}
                     onFocus={e=>e.target.style.borderColor="var(--txt2)"}
                     onBlur={e=>e.target.style.borderColor="var(--border)"}
                   />
+                  <div style={{display:"flex",gap:6,marginTop:6}}>
+                    <button onClick={()=>{const u={...venueNotes,[sv.id]:venueNotes[sv.id]||""};setVenueNotes(u);saveVenueNotes(u);}}
+                      style={{flex:1,padding:"6px",borderRadius:8,border:"none",background:"var(--grn)",color:"#fff",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
+                      💾 Сохранить
+                    </button>
+                    {venueNotes[sv.id]&&<button onClick={()=>{const u={...venueNotes};delete u[sv.id];setVenueNotes(u);saveVenueNotes(u);}}
+                      style={{padding:"6px 10px",borderRadius:8,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
+                      🗑
+                    </button>}
+                  </div>
                 </div>
                 <div style={{padding:"0 14px 8px"}}>
                   <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid var(--grn2)",background:"rgba(90,156,53,.12)",color:"var(--grn3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
