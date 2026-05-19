@@ -1,4 +1,17 @@
 import { supabase } from '../lib/supabase.js'
+import { LIMITS, LIMIT_ERROR_CODES, createLimitError } from '../domain/limits.js'
+
+const customVenueLimitError = (used) => (
+  createLimitError(
+    LIMIT_ERROR_CODES.CUSTOM_VENUES_TOTAL,
+    `В личной карте можно держать до ${LIMITS.CUSTOM_VENUES_TOTAL} заведений`,
+    { limit: LIMITS.CUSTOM_VENUES_TOTAL, used },
+  )
+)
+
+const isCustomVenueLimitError = (error) => (
+  error?.message?.includes('custom_venue_total_limit_exceeded')
+)
 
 export const venueDataService = {
   async listVenueNotes(userId) {
@@ -109,16 +122,31 @@ export const venueDataService = {
   },
 
   async saveCustomVenues(userId, venues) {
-    await supabase.from('custom_venues').delete().eq('user_id', userId)
+    const activeVenueCount = venues.filter((venue) => !venue.deleted).length
+    if (activeVenueCount > LIMITS.CUSTOM_VENUES_TOTAL) {
+      throw customVenueLimitError(activeVenueCount)
+    }
+
+    const { error: deleteError } = await supabase
+      .from('custom_venues')
+      .delete()
+      .eq('user_id', userId)
+
+    if (deleteError) throw deleteError
 
     if (venues.length) {
-      await supabase.from('custom_venues').insert(
+      const { error: insertError } = await supabase.from('custom_venues').insert(
         venues.map((venue) => ({
           user_id: userId,
           venue_data: venue.deleted ? { id: venue.id } : venue,
           deleted: !!venue.deleted,
         })),
       )
+
+      if (insertError) {
+        if (isCustomVenueLimitError(insertError)) throw customVenueLimitError(activeVenueCount)
+        throw insertError
+      }
     }
   },
 }

@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements.js';
 import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
+import { LIMITS, LIMIT_ERROR_CODES } from './domain/limits.js';
 import { INITIAL_USER } from './domain/user.js';
 import { adminService } from './services/adminService.js';
 import { appDataService } from './services/appDataService.js';
@@ -301,6 +302,7 @@ function FogEat({session}){
 
   const visitedIds=new Set(checkins.map(c=>String(c.venueId)));
   const deletedIds=new Set(customVenues.filter(v=>v.deleted).map(v=>String(v.id)));
+  const customVenueCount=customVenues.filter(v=>!v.deleted).length;
   const allVenues=[...catalogVenues.filter(v=>!deletedIds.has(String(v.id))),...customVenues.filter(v=>!v.deleted)];
 
   const filteredVenues=filterVenues({venues:allVenues,search,category:cf,venueLabels});
@@ -1815,6 +1817,9 @@ html,body,#root{height:100%;overflow:hidden}
               {newV.lat?"📍 Метка установлена — изменить на карте":"🗺️ Отметить на карте"}
             </button>
             {newV.lat&&<div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:10}}>можно перетащить оранжевый маркер на карте</div>}
+            <div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:8}}>
+              Модерация: {LIMITS.VENUE_SUBMISSIONS_PER_DAY} в день · личная карта: {customVenueCount}/{LIMITS.CUSTOM_VENUES_TOTAL}
+            </div>
 
             <button
               disabled={venueSubmitting}
@@ -1840,12 +1845,58 @@ html,body,#root{height:100%;overflow:hidden}
                   if(mapInst.current)mapInst.current.getContainer().style.cursor="";
                 }catch(e){
                   console.error(e);
+                  if(e?.code===LIMIT_ERROR_CODES.VENUE_SUBMISSIONS_PER_DAY){
+                    alert(`Сегодня уже отправлено ${LIMITS.VENUE_SUBMISSIONS_PER_DAY} заявки на модерацию. Попробуй завтра.`);
+                    return;
+                  }
                   alert(`Не удалось отправить заявку: ${e?.message || "неизвестная ошибка"}`);
                 }finally{
                   setVenueSubmitting(false);
                 }
               }}>
               {venueSubmitting?"Отправляем...":"✓ Отправить на модерацию"}
+            </button>
+            <button
+              disabled={venueSubmitting||customVenueCount>=LIMITS.CUSTOM_VENUES_TOTAL}
+              style={{width:"100%",padding:11,borderRadius:10,border:"1.5px solid var(--border)",background:"rgba(90,156,53,.08)",color:"var(--grn3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer",marginBottom:7,opacity:(!newV.n||!newV.lat||venueSubmitting||customVenueCount>=LIMITS.CUSTOM_VENUES_TOTAL)?0.5:1}}
+              onClick={async()=>{
+                if(!newV.n){alert("Введи название заведения");return;}
+                if(!newV.lat){alert("Поставь метку на карте");return;}
+                if(customVenueCount>=LIMITS.CUSTOM_VENUES_TOTAL){alert(`В личной карте лимит ${LIMITS.CUSTOM_VENUES_TOTAL} заведений. Удали старое личное место, чтобы добавить новое.`);return;}
+                const CAT_ICON={Ресторан:"🏛️",Кафе:"☕",Бар:"🍺",Пиццерия:"🍕",Хинкальная:"🥟",Бургерная:"🍔",Фастфуд:"🌯","Гриль-бар":"🥩","Суши-бар":"🍣"};
+                const venue={
+                  id:`custom_${Date.now()}`,
+                  n:newV.n,c:newV.c,s:newV.s,a:newV.a,
+                  i:CAT_ICON[newV.c]||"📍",
+                  r:parseFloat(newV.r)||0,rc:0,
+                  ig:newV.ig.trim().replace(/^@/,""),
+                  lat:parseFloat(newV.lat),lng:parseFloat(newV.lng),
+                  custom:true,
+                };
+                const updated=[...customVenues,venue];
+                setVenueSubmitting(true);
+                try{
+                  await saveCustomVenues(updated);
+                  setCustomVenues(updated);
+                  if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
+                  setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
+                  setShowAddVenue(false);
+                  if(mapInst.current){
+                    mapInst.current.getContainer().style.cursor="";
+                    mapInst.current.flyTo([venue.lat,venue.lng],16,{duration:.8});
+                  }
+                }catch(e){
+                  console.error(e);
+                  if(e?.code===LIMIT_ERROR_CODES.CUSTOM_VENUES_TOTAL){
+                    alert(`В личной карте лимит ${LIMITS.CUSTOM_VENUES_TOTAL} заведений. Удали старое личное место, чтобы добавить новое.`);
+                    return;
+                  }
+                  alert(`Не удалось добавить в личную карту: ${e?.message || "неизвестная ошибка"}`);
+                }finally{
+                  setVenueSubmitting(false);
+                }
+              }}>
+              {customVenueCount>=LIMITS.CUSTOM_VENUES_TOTAL?`Личная карта заполнена (${LIMITS.CUSTOM_VENUES_TOTAL})`:"+ Добавить в личную карту"}
             </button>
             <button style={{width:"100%",padding:11,borderRadius:10,border:"none",background:"var(--bg3)",color:"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer"}}
               onClick={()=>{

@@ -36,12 +36,14 @@ The SQL migration for the first Supabase catalog table is:
 
 - `supabase/migrations/20260505000000_create_venues.sql`
 - `supabase/migrations/20260505001000_create_venue_submissions.sql`
+- `supabase/migrations/20260520001000_add_venue_limits.sql`
 
 Run it once in the Supabase SQL editor or through the Supabase CLI before relying on dashboard edits.
 
 New venues added from the map are no longer written directly into the public catalog.
 They are inserted into `public.venue_submissions` with `status = 'pending'`.
 Admins review them in the app, and approval copies the venue into `public.venues`.
+Users can send up to 3 venue submissions per Moscow day, and personal map additions are capped at 10 active custom venues per user.
 
 ## Next Refactor Targets
 

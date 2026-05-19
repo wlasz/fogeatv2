@@ -1,5 +1,38 @@
 import { supabase } from '../lib/supabase.js'
+import { LIMITS, LIMIT_ERROR_CODES, createLimitError } from '../domain/limits.js'
 import { mapVenueRow } from './venueCatalogService.js'
+
+const getMoscowDateKey = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
+const getMoscowDayRange = () => {
+  const start = new Date(`${getMoscowDateKey()}T00:00:00+03:00`)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+
+  return { start, end }
+}
+
+const venueSubmissionLimitError = (used = LIMITS.VENUE_SUBMISSIONS_PER_DAY) => (
+  createLimitError(
+    LIMIT_ERROR_CODES.VENUE_SUBMISSIONS_PER_DAY,
+    `Лимит заявок на сегодня исчерпан: ${LIMITS.VENUE_SUBMISSIONS_PER_DAY} заведения в день`,
+    { limit: LIMITS.VENUE_SUBMISSIONS_PER_DAY, used },
+  )
+)
+
+const isVenueSubmissionLimitError = (error) => (
+  error?.message?.includes('venue_submission_daily_limit_exceeded')
+)
 
 const toSubmissionRow = (userId, venue) => ({
   user_id: userId,
@@ -32,12 +65,45 @@ const toVenueInsertRow = (submission, nextId, nextSortOrder) => ({
 })
 
 export const venueSubmissionService = {
+  async getTodaySubmissionCount(userId) {
+    const usageDate = getMoscowDateKey()
+    const { data: usage, error: usageError } = await supabase
+      .from('venue_submission_daily_usage')
+      .select('submitted_count')
+      .eq('user_id', userId)
+      .eq('usage_date', usageDate)
+      .maybeSingle()
+
+    if (!usageError && usage?.submitted_count !== undefined) {
+      return Number(usage.submitted_count) || 0
+    }
+
+    const { start, end } = getMoscowDayRange()
+    const { count, error } = await supabase
+      .from('venue_submissions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', start.toISOString())
+      .lt('created_at', end.toISOString())
+
+    if (error) throw error
+    return count || 0
+  },
+
   async submitVenue(userId, venue) {
+    const todayCount = await this.getTodaySubmissionCount(userId)
+    if (todayCount >= LIMITS.VENUE_SUBMISSIONS_PER_DAY) {
+      throw venueSubmissionLimitError(todayCount)
+    }
+
     const { error } = await supabase
       .from('venue_submissions')
       .insert(toSubmissionRow(userId, venue))
 
-    if (error) throw error
+    if (error) {
+      if (isVenueSubmissionLimitError(error)) throw venueSubmissionLimitError()
+      throw error
+    }
   },
 
   async listPendingSubmissions() {
