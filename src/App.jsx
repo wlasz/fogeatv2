@@ -182,8 +182,6 @@ function FogEat({session}){
   const[venueRatings,setVenueRatings]=useState({}); // {venueId: {avg, count}}
   const[sortBy,setSortBy]=useState("rating_desc"); // default | rating_desc | rating_asc
   const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
-  const[geoSearch,setGeoSearch]=useState("");
-  const[geoLoading,setGeoLoading]=useState(false);
   const[venueSubmitting,setVenueSubmitting]=useState(false);
   const[placingMarker,setPlacingMarker]=useState(false);
   const placingMarkerRef=useRef(false);
@@ -1805,39 +1803,18 @@ html,body,#root{height:100%;overflow:hidden}
             {/* GEO */}
             <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:6}}>Местоположение *</div>
 
-            {/* Geocoder */}
-            <div style={{display:"flex",gap:6,marginBottom:8}}>
-              <input value={geoSearch} onChange={e=>setGeoSearch(e.target.value)}
-                onKeyDown={async e=>{
-                  if(e.key!=="Enter")return;
-                  setGeoLoading(true);
-                  try{
-                    const res=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geoSearch+", Владикавказ")}&format=json&limit=1`);
-                    const data=await res.json();
-                    if(data[0]){
-                      placeTempMarker(parseFloat(data[0].lat),parseFloat(data[0].lon));
-                    }
-                  }catch(e){}
-                  setGeoLoading(false);
-                }}
-                placeholder="Поиск по названию → Enter"
-                style={{flex:1,padding:"8px 10px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:8,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:11,outline:"none"}}/>
-              {geoLoading&&<div style={{fontSize:10,color:"var(--txt3)",alignSelf:"center"}}>...</div>}
-            </div>
-
             {/* Place on map button */}
             <button
-              style={{width:"100%",padding:"9px",borderRadius:9,border:`2px dashed ${newV.lat?"var(--grn2)":"var(--border)"}`,background:newV.lat?"rgba(90,156,53,.1)":"transparent",color:newV.lat?"var(--grn3)":"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:4,transition:"all .2s"}}
+              style={{width:"100%",padding:"12px",borderRadius:9,border:`2px dashed ${newV.lat?"var(--grn2)":"var(--border)"}`,background:newV.lat?"rgba(90,156,53,.1)":"transparent",color:newV.lat?"var(--grn3)":"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:8,transition:"all .2s"}}
               onClick={()=>{
                 setShowAddVenue(false);
                 placingMarkerRef.current=true;
                 setPlacingMarker(true);
                 if(mapInst.current)mapInst.current.getContainer().style.cursor="crosshair";
               }}>
-              {newV.lat?"📍 Метка установлена — нажми чтобы переставить":"🗺️ Нажми и поставь метку на карте"}
+              {newV.lat?"📍 Метка установлена — изменить на карте":"🗺️ Отметить на карте"}
             </button>
-            {newV.lat&&<div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:10}}>или перетащи оранжевый маркер на карте</div>}
-            {!newV.lat&&<div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:10}}>или найди через поиск выше</div>}
+            {newV.lat&&<div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:10}}>можно перетащить оранжевый маркер на карте</div>}
 
             <button
               disabled={venueSubmitting}
@@ -1859,7 +1836,6 @@ html,body,#root{height:100%;overflow:hidden}
                   alert("Заявка отправлена на модерацию");
                   if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
                   setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
-                  setGeoSearch("");
                   setShowAddVenue(false);
                   if(mapInst.current)mapInst.current.getContainer().style.cursor="";
                 }catch(e){
@@ -1877,7 +1853,6 @@ html,body,#root{height:100%;overflow:hidden}
                 if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
                 if(mapInst.current)mapInst.current.getContainer().style.cursor="";
                 setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
-                setGeoSearch("");
               }}>Отмена</button>
           </div>
         </div>
