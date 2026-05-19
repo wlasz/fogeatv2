@@ -1,178 +1,20 @@
-import { useState, useEffect, useRef, useCallback, Component } from "react";
-import { storage } from './lib/storage.js';
-import { supabase } from './lib/supabase.js';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements.js';
+import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
+import { INITIAL_USER } from './domain/user.js';
+import { adminService } from './services/adminService.js';
+import { appDataService } from './services/appDataService.js';
+import { authService } from './services/authService.js';
+import { checkinService } from './services/checkinService.js';
+import { favoriteService } from './services/favoriteService.js';
+import { menuPhotoService } from './services/menuPhotoService.js';
+import { profileService } from './services/profileService.js';
+import { venueDataService } from './services/venueDataService.js';
+import { venueSubmissionService } from './services/venueSubmissionService.js';
+import { wishlistService } from './services/wishlistService.js';
 
-class ErrorBoundary extends Component {
-  constructor(props){super(props);this.state={error:null};}
-  static getDerivedStateFromError(e){return{error:e.message};}
-  render(){
-    if(this.state.error)return(
-      <div style={{background:"#090c08",color:"#fff",padding:20,fontFamily:"sans-serif",height:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",gap:10}}>
-        <div style={{fontSize:24,color:"#e8a838"}}>FOGEAT</div>
-        <div style={{fontSize:12,color:"#888",textAlign:"center"}}>{this.state.error}</div>
-        <button onClick={()=>window.location.reload()} style={{marginTop:10,padding:"8px 20px",background:"#3d6b25",border:"none",color:"#fff",borderRadius:8,cursor:"pointer"}}>Обновить</button>
-      </div>
-    );
-    return this.props.children;
-  }
-}
-
-const V=[
-{id:1,n:"Cuprum",c:"Ресторан",s:"Европейская",a:"ул. Коцоева, 75",i:"🏛️",r:4.5,rc:197,ig:"cuprum_restaurant",lat:43.0268,lng:44.6744},
-{id:2,n:"Dan",c:"Ресторан",s:"Итал./авторская",a:"ул. Баллаева, 16",i:"🏛️",r:4.5,rc:37,ig:"dan.restaurant",lat:43.0322,lng:44.6781},
-{id:3,n:"Deva Cafe",c:"Ресторан",s:"Гастро",a:"ул. Коцоева, 81",i:"🏛️",r:4.3,rc:13,ig:"deva__cafe",lat:43.0294,lng:44.6734},
-{id:4,n:"KoYROI",c:"Ресторан",s:"Осетинская",a:"ул. Коцоева, 26",i:"🏛️",r:4.4,rc:503,ig:"restoran_koyroi",lat:43.0224,lng:44.6782,dishes:[{id:101,nm:"Фыджин",tg:"Пироги",rt:4.8,pr:400,ph:"🫓",rv:18},{id:102,nm:"Форель на гриле",tg:"Рыба",rt:4.7,pr:650,ph:"🐟",rv:12},{id:103,nm:"Салат с грушей",tg:"Салаты",rt:4.9,pr:380,ph:"🥗",rv:8}]},
-{id:7,n:"Prato Café",c:"Ресторан",s:"Итальянская",a:"ул. Революции, 18",i:"🏛️",r:4.5,rc:32,lat:43.0285,lng:44.6838},
-{id:8,n:"Premier",c:"Ресторан",s:"Европейская",a:"ул. Пашковского, 2а",i:"🏛️",r:4.5,rc:106,ig:"premier_vld",lat:43.0319,lng:44.6724},
-{id:9,n:"Syndicate",c:"Ресторан",s:"Авторская",a:"пр. Мира, 41",i:"🏛️",r:4.4,rc:176,ig:"syndicate.vld",lat:43.0327,lng:44.6798},
-{id:10,n:"Vershina 5033",c:"Ресторан",s:"Европ./кавк.",a:"пр. Мира, 10",i:"🏛️",r:3.4,rc:60,ig:"vershina5033",lat:43.0283,lng:44.6812},
-{id:11,n:"Бавария",c:"Ресторан",s:"Немецкая",a:"ул. Цаликова, 25",i:"🏛️",r:4.5,rc:836,ig:"bavaria_restaurant_",lat:43.0534,lng:44.6733},
-{id:12,n:"Верди",c:"Ресторан",s:"Итальянская",a:"ул. Коцоева, 73а",i:"🏛️",r:4.7,rc:15,ig:"verdi_vld",lat:43.0264,lng:44.6745},
-{id:15,n:"Дендрарий",c:"Ресторан",s:"Европ./кавк.",a:"Московское шоссе",i:"🏛️",r:4.4,rc:1893,ig:"dendrarium_vld",lat:42.98,lng:44.6676},
-{id:16,n:"Къона",c:"Ресторан",s:"Нац. осетинская",a:"пр. Коста, 258",i:"🏛️",r:4.6,rc:494,ig:"kona_ir",lat:43.045,lng:44.6589,dishes:[{id:201,nm:"Лывжа",tg:"Мясо",rt:4.7,pr:450,ph:"🍖",rv:22},{id:202,nm:"Уалибах",tg:"Пироги",rt:4.8,pr:350,ph:"🫓",rv:19},{id:203,nm:"Дзыкка",tg:"Закуски",rt:4.5,pr:280,ph:"🧀",rv:10}]},
-{id:17,n:"Лимончелло",c:"Ресторан",s:"Итальянская",a:"пр. Мира, 45",i:"🏛️",r:4.4,rc:882,ig:"limoncello_vladikavkaz",lat:43.0332,lng:44.6798,dishes:[{id:401,nm:"Пицца 4 сезона",tg:"Пицца",rt:4.3,pr:550,ph:"🍕",rv:30},{id:402,nm:"Сицилийские креветки",tg:"Рыба",rt:4.6,pr:620,ph:"🦐",rv:12}]},
-{id:18,n:"Ман&Гал",c:"Ресторан",s:"Мясной",a:"ул. Ватутина, 50",i:"🏛️",r:4.6,rc:628,ig:"mangal.vld",lat:43.028,lng:44.691,dishes:[{id:301,nm:"Фыджин",tg:"Пироги",rt:4.9,pr:380,ph:"🫓",rv:25},{id:302,nm:"Саджи",tg:"Мясо",rt:4.7,pr:1200,ph:"🍖",rv:18}]},
-{id:19,n:"Минас",c:"Ресторан",s:"Кавк./шашлык",a:"ул. Барбашова, 76",i:"🏛️",r:4.4,rc:692,ig:"minas__cafe",lat:43.0256,lng:44.6384},
-{id:20,n:"Папа Жора",c:"Ресторан",s:"Шашлык",a:"пр. Доватора, 4",i:"🏛️",r:4.6,rc:222,ig:"tractir_vld",lat:43.0149,lng:44.6624},
-{id:21,n:"Lookoom",c:"Ресторан",s:"Восточная",a:"пр. Мира, 35",i:"🏛️",r:4.4,rc:1081,ig:"lookoom_vld",lat:43.0313,lng:44.6801},
-{id:23,n:"Шёлковый путь",c:"Ресторан",s:"Кавказская",a:"пр. Коста, 2",i:"🏛️",r:4.5,rc:303,ig:"shelkoviy_put_",lat:42.9703,lng:44.6676},
-{id:24,n:"Bruges",c:"Ресторан",s:"Паб",a:"ул. Васо Абаева, 108/2",i:"🏛️",r:3.7,rc:23,ig:"bruges_brasserie",lat:43.0465,lng:44.6597},
-{id:26,n:"Коралл",c:"Ресторан",s:"Кавказская",a:"пр. Коста, 274",i:"🏛️",r:4.4,rc:42,ig:"korall_rest",lat:43.0496,lng:44.6558},
-{id:27,n:"Лимон True Cost",c:"Ресторан",s:"True cost",a:"ул. Гриса Плиева, 11",i:"🏛️",r:4.8,rc:0,ig:"limon_restaurant_vld",lat:43.0195,lng:44.675},
-{id:28,n:"Модерн шеф",c:"Ресторан",s:"",a:"ул. Весенняя, 21а",i:"🏛️",r:5.0,rc:0,ig:"modern_chef_vld",lat:43.047,lng:44.6273},
-{id:29,n:"Позитано",c:"Ресторан",s:"Итальянская",a:"пр. Мира, 6",i:"🏛️",r:4.9,rc:0,ig:"positano_osteria",lat:43.0265,lng:44.681},
-{id:30,n:"Регах",c:"Ресторан",s:"Загород",a:"Архонское шоссе, 5",i:"🏛️",r:4.4,rc:140,ig:"regah_restaurant",lat:43.0629,lng:44.6334},
-{id:31,n:"Этно",c:"Ресторан",s:"Кавказская",a:"ул. Сады Шалдона, 59",i:"🏛️",r:5.0,rc:0,ig:"etno_vld",lat:43.0397,lng:44.7001},
-{id:32,n:"Amalfi",c:"Кафе",s:"Осетинская",a:"ул. Барбашова, 2",i:"☕",r:5.0,rc:6,ig:"amalfi_cafe_",lat:43.0307,lng:44.6669},
-{id:33,n:"Luxe Cafe",c:"Кафе",s:"Фастфуд",a:"пр. Доватора, 8а",i:"☕",r:4.4,rc:534,lat:43.0163,lng:44.6612},
-
-{id:35,n:"Y'Remy",c:"Кафе",s:"",a:"ул. Цоколаева, 14а",i:"☕",r:5.0,rc:0,ig:"yremy.rest",lat:43.039,lng:44.6302},
-{id:36,n:"Два Толстяка",c:"Кафе",s:"Хинкали",a:"ул. Б. Ватаева, 59",i:"☕",r:4.4,rc:457,ig:"kafe_dva_tolstyaka",lat:43.033,lng:44.6703},
-{id:38,n:"М&М Хачапурня",c:"Кафе",s:"Хачапури",a:"ул. Коцоева, 19",i:"☕",r:4.5,rc:70,lat:43.0207,lng:44.6786},
-{id:39,n:"Магия",c:"Кафе",s:"Завтраки",a:"ул. Горького, 9",i:"☕",r:4.5,rc:620,lat:43.0281,lng:44.6794},
-{id:40,n:"Октябрь",c:"Кафе",s:"Европейская",a:"пр. Мира, 1",i:"☕",r:4.3,rc:691,ig:"october__cafe_",lat:43.0242,lng:44.6808},
-{id:41,n:"Старый мост",c:"Кафе",s:"Домашняя",a:"ул. Пашковского, 2",i:"☕",r:4.4,rc:319,lat:43.0319,lng:44.6724},
-{id:42,n:"Суадон",c:"Кафе",s:"Кавказская",a:"север города",i:"☕",r:4.5,rc:617,lat:43.059,lng:44.6408},
-{id:43,n:"Фыдджынта",c:"Кафе",s:"Пироги",a:"пр. Коста, 178",i:"☕",r:4.7,rc:1599,ig:"fiddjintae_vladikavkaz",lat:43.0338,lng:44.6659,dishes:[{id:801,nm:"Уалибах",tg:"Пироги",rt:4.8,pr:280,ph:"🫓",rv:35},{id:802,nm:"Картофджин",tg:"Пироги",rt:4.6,pr:260,ph:"🫓",rv:20},{id:803,nm:"Фыджин",tg:"Пироги",rt:4.7,pr:320,ph:"🫓",rv:25}]},
-{id:44,n:"9-ка",c:"Кафе",s:"Бургеры",a:"ул. Маркуса, 77/2",i:"☕",r:4.3,rc:0,ig:"cafe9_ka",lat:43.037,lng:44.683},
-{id:45,n:"Alioli",c:"Кафе",s:"",a:"ул. Гадиева, 19",i:"☕",r:3.4,rc:48,ig:"alioli_vld",lat:43.0169,lng:44.6772},
-{id:46,n:"Dolce Far Niente",c:"Кафе",s:"",a:"ул. Г. Баева, 13",i:"☕",r:4.9,rc:0,ig:"dolcefarniente_moscow",lat:43.0228,lng:44.6822},
-{id:47,n:"Luxe (Магкаева)",c:"Кафе",s:"2-я точка",a:"ул. Магкаева, 79",i:"☕",r:4.7,rc:0,ig:"luxe_caffe",lat:43.0321,lng:44.7072},
-{id:48,n:"Sindbad",c:"Кафе",s:"",a:"ул. Мамсурова, 12",i:"☕",r:5.0,rc:0,ig:"sindbad_cafe_",lat:43.0382,lng:44.6606},
-{id:49,n:"Vinograd",c:"Кафе",s:"Караоке",a:"ул. Цоколаева, 15",i:"☕",r:4.3,rc:360,lat:43.0392,lng:44.6305},
-{id:50,n:"Мимино",c:"Кафе",s:"Грузинская",a:"ул. Влад-ая, 17а",i:"☕",r:4.3,rc:292,lat:43.0456,lng:44.6348},
-{id:51,n:"Наш дворик",c:"Кафе",s:"",a:"ул. Чапаева, 68",i:"☕",r:4.2,rc:22,ig:"nash_dvorik_food",lat:43.0476,lng:44.6213},
-{id:52,n:"Хинкальный дворик",c:"Кафе",s:"Грузинская",a:"ул. Герасимова, 23",i:"☕",r:4.5,rc:140,ig:"hinkalny.dvorik_vld",lat:43.0435,lng:44.671},
-{id:53,n:"Чегери",c:"Кафе",s:"",a:"ул. К. Маркса, 100а",i:"☕",r:4.6,rc:0,ig:"chegeri_vld",lat:43.0372,lng:44.6665},
-{id:54,n:"Vincenzo Музей",c:"Кафе-сеть",s:"Пицца",a:"ул. Революции, 61",i:"☕",r:4.2,rc:282,lat:43.0349,lng:44.6823},
-{id:55,n:"Доменика",c:"Кафе-сеть",s:"",a:"ул. Куйбышева, 18",i:"☕",r:4.2,rc:610,ig:"domenika_cafe",lat:43.0309,lng:44.6841},
-{id:56,n:"Зерно",c:"Кафе/пиццерия",s:"Пицца на дровах",a:"ул. Влад-ая, 33А",i:"🍕",r:4.9,rc:0,ig:"zernopizza",lat:43.0463,lng:44.634},
-{id:57,n:"Мясо & Мята",c:"Гриль-бар",s:"Бургеры/стейки",a:"ул. Джанаева, 12",i:"🥩",r:4.5,rc:318,ig:"meat_vladikavkaz",lat:43.0322,lng:44.6786},
-{id:58,n:"Smoke BBQ",c:"Гриль-бар",s:"Барбекю",a:"ул. Горького, 70",i:"🥩",r:5.0,rc:0,ig:"smokebbqvld",lat:43.029,lng:44.693},
-{id:59,n:"Дом Хинкали",c:"Хинкальная",s:"Хинкали",a:"ул. Ростовская, 54",i:"🥟",r:4.5,rc:511,ig:"dom_xinkali",lat:43.04,lng:44.6833},
-{id:60,n:"Хинкальная #1",c:"Хинкальная",s:"Хинкали",a:"ул. Куйбышева, 45",i:"🥟",r:4.5,rc:165,lat:43.0322,lng:44.6937},
-{id:61,n:"Хинкальная на Чапаева",c:"Хинкальная",s:"",a:"ул. Чапаева, 66",i:"🥟",r:4.3,rc:107,ig:"_khinkalnaya_",lat:43.0474,lng:44.6735},
-{id:62,n:"Хонга-Хинкали",c:"Хинкальная",s:"Хинкали",a:"ул. Кесаева, 16",i:"🥟",r:4.7,rc:146,ig:"xinkalixonga",lat:43.0349,lng:44.6665},
-{id:63,n:"Чиго",c:"Хинкальная",s:"Хинкали",a:"ул. Магкаева, 2",i:"🥟",r:4.3,rc:0,ig:"hinkali_chigo",lat:43.032,lng:44.707},
-{id:64,n:"Шеф",c:"Хинкальная",s:"Хинкали",a:"ул. Кырджалийская, 10Б",i:"🥟",r:5.0,rc:0,ig:"chef_cafe_vld",lat:43.022729,lng:44.649677},
-{id:65,n:"New York Pizza",c:"Пиццерия",s:"Пицца",a:"пр. Коста, 266",i:"🍕",r:4.3,rc:294,ig:"pizza.new.york",lat:43.0466,lng:44.6576},
-{id:66,n:"Додо (Мира)",c:"Пиццерия",s:"Пицца",a:"пр. Мира, 32",i:"🍕",r:4.9,rc:0,lat:43.0305,lng:44.6805},
-{id:67,n:"Додо (Плиева)",c:"Пиццерия",s:"Пицца",a:"ул. Плиева, 25",i:"🍕",r:4.0,rc:142,lat:43.0186,lng:44.6743},
-{id:68,n:"Sushiset",c:"Суши-бар",s:"Суши",a:"ул. Куйбышева, 69",i:"🍣",r:4.5,rc:273,ig:"sushiset_vld",lat:43.0323,lng:44.6982},
-{id:69,n:"Unagi Rolls",c:"Суши-бар",s:"Суши/удон",a:"ул. Московская, 2",i:"🍣",r:4.9,rc:342,ig:"_unagi_rolls_",lat:43.0591,lng:44.6561},
-{id:70,n:"Buffalo",c:"Бургерная",s:"Бургеры",a:"ул. Ленина, 64",i:"🍔",r:4.5,rc:30,lat:43.0221,lng:44.682},
-{id:71,n:"Gaucho",c:"Бургерная",s:"Бургеры",a:"ул. Плиева, 28",i:"🍔",r:4.5,rc:389,ig:"gaucho_vladikavkaz",lat:43.0195,lng:44.675},
-{id:72,n:"Oldschool",c:"Бургерная",s:"Бургеры",a:"ул. Леваневского, 53а",i:"🍔",r:4.5,rc:406,ig:"oldschoolburgers",lat:43.0355,lng:44.6548},
-{id:73,n:"Sandwich St.",c:"Бургерная",s:"Сэндвичи",a:"ул. Леваневского, 53а",i:"🍔",r:4.7,rc:380,ig:"gaucho_vladikavkaz",lat:43.0355,lng:44.6548},
-{id:74,n:"Express Шаурма",c:"Фастфуд",s:"Шаурма",a:"пр. Коста, 224а",i:"🌯",r:3.0,rc:64,ig:"expressshaurma",lat:43.0385,lng:44.6635},
-{id:75,n:"Food Corner",c:"Фастфуд",s:"Фалафель",a:"ул. Плиева, 18",i:"🌯",r:4.3,rc:241,ig:"foodcorner_vlad",lat:43.0198,lng:44.6761},
-{id:76,n:"Вертел",c:"Фастфуд",s:"Шаурма/гриль",a:"ул. Мамсурова, 42",i:"🌯",r:4.4,rc:591,ig:"vertel_vld",lat:43.0363,lng:44.6552},
-{id:77,n:"Джейхан",c:"Фастфуд",s:"Шаурма",a:"ул. Горького, 38",i:"🌯",r:4.2,rc:1237,ig:"bistro_djeikhan",lat:43.0292,lng:44.688},
-{id:78,n:"Бейрут",c:"Фастфуд",s:"Арабская",a:"Петровский пер., 5",i:"🌯",r:4.3,rc:508,ig:"kafe_beirut_",lat:43.0344,lng:44.681},
-{id:79,n:"Хатта",c:"Фастфуд",s:"Шаурма",a:"ул. Морс. Пехотинцев",i:"🌯",r:4.5,rc:46,ig:"fast_food_hatta",lat:43.0378,lng:44.6321},
-{id:80,n:"Чебуреки Решают",c:"Фастфуд",s:"Чебуреки",a:"ул. Кирова, 38",i:"🌯",r:4.4,rc:183,ig:"chebureki_reshaut_vakansii",lat:43.0347,lng:44.6803},
-{id:81,n:"Шаурмания",c:"Фастфуд",s:"Шаурма",a:"ул. Влад-ая, 25б",i:"🌯",r:3.9,rc:636,ig:"shaurmania_vladikavkaz",lat:43.0463,lng:44.634},
-{id:82,n:"Шаурмания 2",c:"Фастфуд",s:"Шаурма",a:"ул. Мамсурова, 14",i:"🌯",r:4.0,rc:621,lat:43.0382,lng:44.6606},
-{id:83,n:"Шаурмания Халяль",c:"Фастфуд",s:"Шаурма",a:"ул. Барбашова, 46А",i:"🌯",r:4.1,rc:423,lat:43.0283,lng:44.658},
-{id:84,n:"Rostic's",c:"Фастфуд-сеть",s:"Курица",a:"пр. Доватора, 97",i:"🌯",r:3.9,rc:517,lat:43.0434,lng:44.6412},
-{id:85,n:"Бургер Кинг",c:"Фастфуд-сеть",s:"Бургеры",a:"пр. Мира, 24",i:"🌯",r:3.0,rc:82,lat:43.0303,lng:44.6809},
-{id:86,n:"Вкусно и точка",c:"Фастфуд-сеть",s:"Бургеры",a:"пр. Мира, 50",i:"🌯",r:4.2,rc:0,lat:43.0343,lng:44.6801},
-{id:87,n:"Agava",c:"Винный бар",s:"Коктейли",a:"ул. Гибизова, 8а",i:"🍷",r:5.0,rc:8,ig:"agava_vld",lat:43.0283,lng:44.6786},
-{id:88,n:"Berdinberg",c:"Бар",s:"Пиво/бургеры",a:"пр. Мира, 17",i:"🍺",r:3.8,rc:33,ig:"berdinberg",lat:43.0284,lng:44.6805},
-{id:89,n:"Wish Bar",c:"Бар",s:"Рок-бар",a:"ул. Маяковского, 22",i:"🍺",r:4.5,rc:201,ig:"bar_wish",lat:43.0331,lng:44.6808},
-{id:90,n:"Асгард",c:"Бар",s:"Крафт",a:"ул. Магкаева, 59",i:"🍺",r:3.7,rc:12,ig:"asgard_brewery",lat:43.0321,lng:44.7072},
-{id:91,n:"Осет. пивоварня",c:"Бар",s:"Крафт. пиво",a:"ул. Весенняя, 1",i:"🍺",r:4.6,rc:486,ig:"beer_vladikavkaz",lat:43.0346,lng:44.6378,dishes:[{id:701,nm:"Коричневое крафт",tg:"Пиво",rt:4.7,pr:200,ph:"🍺",rv:30},{id:702,nm:"Тёмное нефильтр.",tg:"Пиво",rt:4.6,pr:200,ph:"🍺",rv:22},{id:703,nm:"Пирог с сыром/свёклой",tg:"Пироги",rt:4.8,pr:280,ph:"🫓",rv:18}]},
-{id:92,n:"Пивная СССР",c:"Бар",s:"Советский",a:"пр. Мира, 52",i:"🍺",r:4.6,rc:199,lat:43.0344,lng:44.6802},
-];
-
-const CATS=[
-  {k:"all",l:"Все"},
-  {k:"Ресторан",l:"🏛️ Рестораны"},
-  {k:"Кафе",l:"☕ Кафе"},
-  {k:"Хинкальная",l:"🥟 Хинкальные"},
-  {k:"Пиццерия",l:"🍕 Пиццерии"},
-  {k:"Суши-бар",l:"🍣 Суши"},
-  {k:"Бургерная",l:"🍔 Бургерные"},
-  {k:"Гриль-бар",l:"🥩 Гриль"},
-  {k:"Фастфуд",l:"🌯 Фастфуд"},
-  {k:"Бар",l:"🍺 Бары"},
-];
-
-const VENUE_COLOR = (visited) => visited
-  ? {bg:"#1a2e14",accent:"#5a9c35",text:"#7fd458"}
-  : {bg:"#1a1a1a",accent:"#3a3a3a",text:"#666"};
-
-const FEED=[
-  {u:"Алан",v:"Къона",d:"Уалибах",r:5,t:"2ч",e:"🫓"},
-  {u:"Мадина",v:"Papillon",d:"Утка с пюре",r:5,t:"3ч",e:"🍷"},
-  {u:"Тамерлан",v:"Ман&Гал",d:"Саджи",r:5,t:"5ч",e:"🍖"},
-  {u:"Залина",v:"Осет. пивоварня",d:"Коричневое",r:4,t:"вчера",e:"🍺"},
-  {u:"Wlasz",v:"Лимончелло",d:"Пицца 4 сезона",r:4,t:"вчера",e:"🍕"},
-  {u:"Руслан",v:"Старый мост",d:"Форель",r:5,t:"вчера",e:"🐟"},
-  {u:"Анна",v:"KoYROI",d:"Салат с грушей",r:5,t:"2 дня",e:"🥗"},
-];
-
-// Цепочки ачивок — показывается только текущий шаг
-const ACH_CHAINS=[
-  {chain:"venues",steps:[
-    {k:"venues_10",n:"Исследователь",i:"🔍",d:"Открыть 10 заведений",t:10},
-    {k:"venues_25",n:"Картограф",i:"🗺️",d:"Открыть 25 заведений",t:25},
-    {k:"venues_50",n:"Охотник",i:"🏹",d:"Открыть 50 заведений",t:50},
-    {k:"venues_all",n:"Покоритель",i:"🏆",d:"Открыть все 91 заведение",t:91},
-  ]},
-  {chain:"checkins",steps:[
-    {k:"checkins_10",n:"Гурман",i:"🍽️",d:"Сделать 10 чекинов",t:10},
-    {k:"checkins_25",n:"Завсегдатай",i:"🎯",d:"Сделать 25 чекинов",t:25},
-    {k:"checkins_50",n:"Легенда",i:"👑",d:"Сделать 50 чекинов",t:50},
-  ]},
-  {chain:"photos",steps:[
-    {k:"photos_5",n:"Фотограф",i:"📸",d:"5 чекинов с фото",t:5},
-    {k:"photos_10",n:"Паппарацци",i:"📷",d:"10 чекинов с фото",t:10},
-  ]},
-  {chain:"cat_rest",steps:[
-    {k:"cat_rest_3",n:"Ресторанный",i:"🏛️",d:"Посетить 3 ресторана",t:3},
-    {k:"cat_rest_5",n:"Ресторатор",i:"🥂",d:"Посетить 5 ресторанов",t:5},
-  ]},
-  {chain:"cat_hink",steps:[
-    {k:"cat_hink_1",n:"Любитель хинкали",i:"🥟",d:"Посетить хинкальную",t:1},
-    {k:"cat_hink_3",n:"Хинкальщик",i:"🥟",d:"Посетить 3 хинкальных",t:3},
-  ]},
-  // одиночные
-  {chain:"all_cats",steps:[{k:"all_cats",n:"Всеядный",i:"🌈",d:"Посетить все категории заведений",t:9}]},
-  {chain:"custom",steps:[{k:"custom_5",n:"Разведчик",i:"🧭",d:"Добавить 5 своих заведений",t:5}]},
-  {chain:"reviews",steps:[{k:"reviews_10",n:"Критик",i:"✍️",d:"10 отзывов с текстом",t:10}]},
-  {chain:"wishlist",steps:[{k:"wishlist_5",n:"Мечтатель",i:"📌",d:"Добавить 5 мест в вишлист",t:5}]},
-  {chain:"five_stars",steps:[{k:"five_stars_5",n:"Перфекционист",i:"⭐",d:"Поставить 5★ пять раз",t:5}]},
-  {chain:"honest",steps:[{k:"honest_critic",n:"Честный критик",i:"😤",d:"Поставить ниже 3★ три раза",t:3}]},
-  {chain:"cat_bar",steps:[{k:"cat_bar",n:"Завсегдатай баров",i:"🍺",d:"Посетить 3 бара",t:3}]},
-  {chain:"cat_sushi",steps:[{k:"cat_sushi",n:"Суши-мастер",i:"🍣",d:"Посетить суши-бар",t:1}]},
-  {chain:"early_bird",steps:[{k:"early_bird",n:"Ранняя пташка",i:"🌅",d:"Чекин до 10:00 утра",t:1}]},
-  {chain:"night_owl",steps:[{k:"night_owl",n:"Сова",i:"🦉",d:"Чекин после 23:00",t:1}]},
-];
-
-const INIT_ACHS=ACH_CHAINS;
-
-const INIT_USER={name:"Wlasz",level:1,title:"Новичок",xp:0,nxp:200,venues:0,checkins:0,reviews:0,photos:0};
+const getInstagramUrl = (handle) => `https://www.instagram.com/${handle}`;
 
 export default function App(){
   return <ErrorBoundary><AuthWrapper/></ErrorBoundary>;
@@ -182,9 +24,8 @@ function AuthWrapper(){
   const[session,setSession]=useState(undefined); // undefined = loading
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}})=>setSession(session));
-    const{data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>setSession(session));
-    return()=>subscription.unsubscribe();
+    authService.getSession().then(setSession);
+    return authService.onSessionChange(setSession);
   },[]);
 
   if(session===undefined)return(
@@ -209,14 +50,14 @@ function AuthScreen(){
   const handle=async()=>{
     setError("");setSuccess("");setLoading(true);
     if(mode==="login"){
-      const{error}=await supabase.auth.signInWithPassword({email,password});
+      const{error}=await authService.signIn(email,password);
       if(error)setError(error.message);
     } else {
       if(!username.trim()){setError("Введи username");setLoading(false);return;}
-      const{data,error}=await supabase.auth.signUp({email,password});
+      const{data,error}=await authService.signUp(email,password);
       if(error){setError(error.message);}
       else if(data.user){
-        await supabase.from("profiles").insert({id:data.user.id,username:username.trim().toLowerCase()});
+        await profileService.createProfile(data.user.id,username.trim().toLowerCase());
         setSuccess("Проверь email — отправили письмо для подтверждения");
       }
     }
@@ -310,8 +151,8 @@ function FogEat({session}){
   const[checkins,setCheckins]=useState([]);
   const[wishVenues,setWishVenues]=useState([]);
   const[wishDishes,setWishDishes]=useState([]);
-  const[user,setUser]=useState(INIT_USER);
-  const[achs,setAchs]=useState(INIT_ACHS);
+  const[user,setUser]=useState(INITIAL_USER);
+
   const[dishNote,setDishNote]=useState("");
   const[dishName,setDishName]=useState("");
   const[reviewText,setReviewText]=useState("");
@@ -334,88 +175,40 @@ function FogEat({session}){
   const[visitNote,setVisitNote]=useState("");
   const[visitRating,setVisitRating]=useState(0);
   const[showAddVenue,setShowAddVenue]=useState(false);
+  const[catalogVenues,setCatalogVenues]=useState(DEFAULT_VENUES);
   const[customVenues,setCustomVenues]=useState([]);
   const[venueRatings,setVenueRatings]=useState({}); // {venueId: {avg, count}}
   const[sortBy,setSortBy]=useState("rating_desc"); // default | rating_desc | rating_asc
-  const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
+  const[newV,setNewV]=useState({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
   const[geoSearch,setGeoSearch]=useState("");
   const[geoLoading,setGeoLoading]=useState(false);
+  const[venueSubmitting,setVenueSubmitting]=useState(false);
   const[placingMarker,setPlacingMarker]=useState(false);
   const placingMarkerRef=useRef(false);
   const tempMarkerRef=useRef(null);
 
-  // Load from storage — каждый ключ независимо
   useEffect(()=>{
-    const g=async(key)=>{try{const r=await storage.get(key);return r?JSON.parse(r.value):null;}catch(e){return null;}};
     const load=async()=>{
-      // загружаем роль из profiles
-      if(currentUser){
-        const{data}=await supabase.from('profiles').select('role,username').eq('id',currentUser.id).single();
-        if(data?.role==='admin')setIsAdmin(true);
-        if(data?.username)setUser(u=>({...u,name:data.username}));
-      }
+      const data=await appDataService.loadUserAppData(uid);
 
-      // чекины из таблицы
-      const{data:ck}=await supabase.from('checkins').select('*').eq('user_id',uid).order('created_at',{ascending:false});
-      if(ck?.length)setCheckins(ck.map(c=>({id:c.id,venueId:c.venue_id,venueName:c.venue_name,dish:c.dish,rating:c.rating,review:c.review,price:c.price,date:c.date,time:c.time,photoKey:c.photo_key,photoUrl:c.photo_url})));
-
-      // вишлист из таблицы
-      const{data:wv}=await supabase.from('wishlist').select('*').eq('user_id',uid).order('created_at',{ascending:false});
-      if(wv?.length)setWishVenues(wv.map(w=>({id:w.venue_id,n:w.venue_name,c:w.venue_icon})));
-
-      // заметки из таблицы
-      const{data:vn}=await supabase.from('venue_notes').select('*').eq('user_id',uid);
-      if(vn?.length){const notes={};vn.forEach(n=>{notes[n.venue_id]=n.note;});setVenueNotes(notes);}
-
-      // теги из таблицы
-      const{data:cl}=await supabase.from('venue_labels').select('*').eq('user_id',uid);
-      if(cl?.length)setCustomLabels(cl.map(l=>({id:l.label_id,name:l.label_name,emoji:l.label_emoji,color:l.label_color})));
-
-      // назначения тегов из таблицы
-      const{data:vl}=await supabase.from('venue_label_assignments').select('*').eq('user_id',uid);
-      if(vl?.length){const labels={};vl.forEach(a=>{if(!labels[a.venue_id])labels[a.venue_id]=[];labels[a.venue_id].push(a.label_id);});setVenueLabels(labels);}
-
-      // кастомные заведения из таблицы
-      const{data:cv}=await supabase.from('custom_venues').select('*').eq('user_id',uid);
-      if(cv?.length)setCustomVenues(cv.map(c=>c.deleted?{id:c.venue_data?.id,deleted:true}:c.venue_data));
-
-      // рейтинги всех пользователей по заведениям
-      try{
-        const{data:allRatings}=await supabase.from('checkins').select('venue_id,rating').gt('rating',0);
-        if(allRatings?.length){
-          const sums={},counts={};
-          allRatings.forEach(c=>{
-            sums[c.venue_id]=(sums[c.venue_id]||0)+c.rating;
-            counts[c.venue_id]=(counts[c.venue_id]||0)+1;
-          });
-          const ratings={};
-          Object.keys(sums).forEach(id=>{
-            ratings[id]={avg:+(sums[id]/counts[id]).toFixed(1),count:counts[id]};
-          });
-          setVenueRatings(ratings);
-        }
-      }catch(e){}
-
-      // одобренные фото меню
-      try{
-        const{data:approvedPhotos}=await supabase.from('menu_photos').select('*').eq('status','approved');
-        if(approvedPhotos?.length){
-          const grouped={};
-          approvedPhotos.forEach(p=>{
-            if(!grouped[p.venue_id])grouped[p.venue_id]=[];
-            grouped[p.venue_id].push({src:p.photo_url,path:p.photo_path,id:p.id,date:new Date(p.created_at).toLocaleDateString('ru-RU')});
-          });
-          setMenuPhotos(prev=>({...prev,...grouped}));
-        }
-      }catch(e){}
+      if(data.profile?.role==='admin')setIsAdmin(true);
+      if(data.profile?.username)setUser(u=>({...u,name:data.profile.username}));
+      setCheckins(data.checkins);
+      setWishVenues(data.wishVenues);
+      setVenueNotes(data.venueNotes);
+      setCustomLabels(data.customLabels);
+      setVenueLabels(data.venueLabels);
+      setCatalogVenues(data.catalogVenues);
+      setCustomVenues(data.customVenues);
+      setVenueRatings(data.venueRatings);
+      setMenuPhotos(prev=>({...prev,...data.menuPhotos}));
     };
     load();
 
-    // обновляем данные когда пользователь возвращается на вкладку
     const onVisible=()=>{if(document.visibilityState==="visible")load();};
     document.addEventListener("visibilitychange",onVisible);
     return()=>document.removeEventListener("visibilitychange",onVisible);
-  },[]);
+  },[uid]);
 
   const placeTempMarker=(lat,lng)=>{
     if(!mapInst.current||!window.L)return;
@@ -435,71 +228,28 @@ function FogEat({session}){
 
 
 
-  const saveMenuPhotos=async()=>{}; // теперь через menu_photos таблицу
+  const saveMenuPhotos=async()=>{}; // persisted by menuPhotoService
 
-  const saveVenueNotes=async(data)=>{
-    for(const[venueId,note] of Object.entries(data)){
-      if(note){
-        await supabase.from('venue_notes').upsert({user_id:uid,venue_id:parseInt(venueId),note,updated_at:new Date().toISOString()},{onConflict:'user_id,venue_id'});
-      } else {
-        await supabase.from('venue_notes').delete().eq('user_id',uid).eq('venue_id',parseInt(venueId));
-      }
-    }
-    // удаляем записи которых нет в data
-    const{data:existing}=await supabase.from('venue_notes').select('venue_id').eq('user_id',uid);
-    if(existing){
-      for(const row of existing){
-        if(data[row.venue_id]===undefined){
-          await supabase.from('venue_notes').delete().eq('user_id',uid).eq('venue_id',row.venue_id);
-        }
-      }
-    }
-  };
+  const saveVenueNotes=async(data)=>venueDataService.saveVenueNotes(uid,data);
 
-  const saveCustomLabels=async(data)=>{
-    await supabase.from('venue_labels').delete().eq('user_id',uid);
-    if(data.length)await supabase.from('venue_labels').insert(data.map(l=>({user_id:uid,label_id:l.id,label_name:l.name,label_emoji:l.emoji,label_color:l.color})));
-  };
+  const saveCustomLabels=async(data)=>venueDataService.saveCustomLabels(uid,data);
 
-  const saveVenueLabels=async(data)=>{
-    await supabase.from('venue_label_assignments').delete().eq('user_id',uid);
-    const rows=[];
-    for(const[venueId,labelIds] of Object.entries(data)){
-      labelIds.forEach(lid=>rows.push({user_id:uid,venue_id:parseInt(venueId),label_id:lid}));
-    }
-    if(rows.length)await supabase.from('venue_label_assignments').insert(rows);
-  };
+  const saveVenueLabels=async(data)=>venueDataService.saveVenueLabels(uid,data);
 
-  const saveCheckins=async()=>{}; // теперь через checkins таблицу
+  const saveCheckins=async()=>{}; // persisted by checkinService
 
-  const saveWishVenues=async(data)=>{
-    await supabase.from('wishlist').delete().eq('user_id',uid);
-    if(data.length)await supabase.from('wishlist').insert(data.map(w=>({user_id:uid,venue_id:w.id,venue_name:w.n,venue_icon:w.c})));
-  };
+  const saveWishVenues=async(data)=>wishlistService.saveWishVenues(uid,data);
 
-  const saveWishDishes=async()=>{}; // пока не мигрировано
+  const saveWishDishes=async()=>{}; // not migrated yet
 
-  const saveUser=async()=>{}; // XP/уровень пока в памяти
+  const saveUser=async()=>{}; // XP/level are still in memory
 
-  const saveCustomVenues=async(data)=>{
-    await supabase.from('custom_venues').delete().eq('user_id',uid);
-    if(data.length)await supabase.from('custom_venues').insert(
-      data.map(v=>({user_id:uid,venue_data:v.deleted?{id:v.id}:v,deleted:!!v.deleted}))
-    );
-  };
+  const saveCustomVenues=async(data)=>venueDataService.saveCustomVenues(uid,data);
 
-  // загружаем фото чекинов когда открывается панель заведения
   useEffect(()=>{
     if(!sv)return;
     const load=async()=>{
-      const myci=checkins.filter(c=>c.venueId===sv.id);
-      const photos={};
-      for(const c of myci){
-        if(c.photoUrl){photos[c.id]=c.photoUrl;}
-        else if(c.photoKey){
-          try{const r=await storage.get(c.photoKey);if(r)photos[c.id]=r.value;}catch(e){}
-        }
-      }
+      const photos=await checkinService.getPhotoMapForVenue(checkins,sv.id);
       setCheckinPhotos(p=>({...p,...photos}));
     };
     load();
@@ -539,43 +289,11 @@ function FogEat({session}){
 
   const visitedIds=new Set(checkins.map(c=>String(c.venueId)));
   const deletedIds=new Set(customVenues.filter(v=>v.deleted).map(v=>String(v.id)));
-  const allVenues=[...V.filter(v=>!deletedIds.has(String(v.id))),...customVenues.filter(v=>!v.deleted)];
+  const allVenues=[...catalogVenues.filter(v=>!deletedIds.has(String(v.id))),...customVenues.filter(v=>!v.deleted)];
 
-  const catMatch=(c,cf)=>{
-    if(cf==="all")return true;
-    if(cf==="Ресторан")return c==="Ресторан";
-    if(cf==="Кафе")return c==="Кафе"||c==="Кафе-сеть"||c==="Кафе/пиццерия";
-    if(cf==="Хинкальная")return c==="Хинкальная";
-    if(cf==="Пиццерия")return c==="Пиццерия"||c==="Кафе/пиццерия";
-    if(cf==="Суши-бар")return c==="Суши-бар";
-    if(cf==="Бургерная")return c==="Бургерная";
-    if(cf==="Гриль-бар")return c==="Гриль-бар";
-    if(cf==="Фастфуд")return c==="Фастфуд"||c==="Фастфуд-сеть";
-    if(cf==="Бар")return c==="Бар"||c==="Бар/караоке"||c==="Винный бар";
-    return c===cf;
-  };
-
-  const fl=allVenues.filter(v=>{
-    const sm=!search||v.n.toLowerCase().includes(search.toLowerCase())||v.a.toLowerCase().includes(search.toLowerCase());
-    if(cf.startsWith("lbl_")){
-      const lblId=cf.slice(4);
-      return (venueLabels[String(v.id)]||[]).includes(lblId)&&sm;
-    }
-    return catMatch(v.c,cf)&&sm;
-  }).sort((a,b)=>{
-    if(sortBy==="rating_desc"){const ra=venueRatings[a.id]?.avg||0,rb=venueRatings[b.id]?.avg||0;return rb-ra;}
-    if(sortBy==="rating_asc"){const ra=venueRatings[a.id]?.avg||0,rb=venueRatings[b.id]?.avg||0;return ra-rb;}
-    return 0;
-  });
-
-  const mapVenues=allVenues.filter(v=>{
-    const sm=!search||v.n.toLowerCase().includes(search.toLowerCase())||v.a.toLowerCase().includes(search.toLowerCase());
-    if(cf.startsWith("lbl_")){
-      const lblId=cf.slice(4);
-      return (venueLabels[String(v.id)]||[]).includes(lblId)&&sm;
-    }
-    return catMatch(v.c,cf)&&sm;
-  });
+  const filteredVenues=filterVenues({venues:allVenues,search,category:cf,venueLabels});
+  const fl=sortVenues(filteredVenues,sortBy,venueRatings);
+  const mapVenues=filteredVenues;
 
   const um=useCallback(()=>{
     if(!mapInst.current||!window.L)return;
@@ -650,15 +368,9 @@ function FogEat({session}){
     let photoUrl=null;
     if(checkinPhoto){
       try{
-        const res=await fetch(checkinPhoto);
-        const blob=await res.blob();
-        const path=`${venue.id}/${id}.jpg`;
-        const{error}=await supabase.storage.from('checkin-photos').upload(path,blob,{contentType:'image/jpeg',upsert:true});
-        if(!error){
-          const{data}=supabase.storage.from('checkin-photos').getPublicUrl(path);
-          photoKey=path;
-          photoUrl=data.publicUrl;
-        }
+        const uploaded=await checkinService.uploadCheckinPhoto({venueId:venue.id,checkinId:id,photoDataUrl:checkinPhoto});
+        photoKey=uploaded.photoKey;
+        photoUrl=uploaded.photoUrl;
       }catch(e){}
     }
     const newCheckin={
@@ -668,16 +380,8 @@ function FogEat({session}){
       time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
       photoKey,photoUrl,
     };
-    // Сохраняем в Supabase таблицу
     try{
-      await supabase.from('checkins').insert({
-        id,user_id:currentUser.id,
-        venue_id:venue.id,venue_name:venue.n,
-        dish:dishName||"Блюдо",rating:cr,review:reviewText,
-        price,date:now.toLocaleDateString("ru-RU"),
-        time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
-        photo_key:photoKey,photo_url:photoUrl,
-      });
+      await checkinService.createCheckin(currentUser.id,newCheckin);
     }catch(e){}
     const updated=[newCheckin,...checkins];
     setCheckins(updated);
@@ -701,13 +405,7 @@ function FogEat({session}){
       type:"visit",
     };
     try{
-      await supabase.from('checkins').insert({
-        id,user_id:currentUser.id,
-        venue_id:venue.id,venue_name:venue.n,
-        dish:"",rating:visitRating,review:visitNote,price:"",
-        date:now.toLocaleDateString("ru-RU"),
-        time:`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`,
-      });
+      await checkinService.createCheckin(currentUser.id,newCheckin);
     }catch(e){}
     const updated=[newCheckin,...checkins];
     setCheckins(updated);saveCheckins(updated);
@@ -728,6 +426,21 @@ function FogEat({session}){
     setWishVenues(updated);saveWishVenues(updated);
   };
 
+  const deleteUserCheckin=async(checkin)=>{
+    await checkinService.deleteCheckin(checkin.id,checkin.photoKey);
+    const updated=checkins.filter(ch=>ch.id!==checkin.id);
+    setCheckins(updated);
+    setCheckinPhotos(p=>{const n={...p};delete n[checkin.id];return n;});
+    setConfirmDeleteCheckin(null);
+  };
+
+  const removeMenuPhoto=async(venueId,index)=>{
+    const photo=menuPhotos[venueId]?.[index];
+    if(photo?.path)await menuPhotoService.removeMenuPhotoFile(photo.path);
+    const updated={...menuPhotos,[venueId]:(menuPhotos[venueId]||[]).filter((_,j)=>j!==index)};
+    setMenuPhotos(updated);saveMenuPhotos(updated);
+  };
+
   const Stars=({v,onChange})=>(
     <div style={{display:"flex",justifyContent:"center",gap:6,margin:"8px 0"}}>
       {[1,2,3,4,5].map(i=>(
@@ -746,43 +459,12 @@ function FogEat({session}){
   const myCheckins=checkins.filter(c=>c.venueId===sv?.id);
   const isWished=sv&&wishVenues.find(w=>w.id===sv.id);
 
-  const getProgress=(k)=>{
-    const uVenues=visitedIds.size;
-    const uCats=new Set(checkins.map(c=>allVenues.find(v=>v.id===c.venueId)?.c).filter(Boolean)).size;
-    if(k==="venues_10"||k==="venues_25"||k==="venues_50"||k==="venues_all")return uVenues;
-    if(k==="all_cats")return uCats;
-    if(k==="custom_5")return customVenues.filter(v=>!v.deleted).length;
-    if(k==="checkins_10"||k==="checkins_25"||k==="checkins_50")return checkins.length;
-    if(k==="photos_5"||k==="photos_10")return checkins.filter(c=>c.photoKey).length;
-    if(k==="reviews_10")return checkins.filter(c=>c.review&&c.review.length>2).length;
-    if(k==="wishlist_5")return wishVenues.length;
-    if(k==="five_stars_5")return checkins.filter(c=>c.rating===5).length;
-    if(k==="honest_critic")return checkins.filter(c=>c.rating>0&&c.rating<3).length;
-    if(k==="cat_rest_3"||k==="cat_rest_5")return new Set(checkins.filter(c=>allVenues.find(v=>v.id===c.venueId)?.c==="Ресторан").map(c=>c.venueId)).size;
-    if(k==="cat_bar")return new Set(checkins.filter(c=>["Бар","Бар/караоке","Винный бар"].includes(allVenues.find(v=>v.id===c.venueId)?.c)).map(c=>c.venueId)).size;
-    if(k==="cat_sushi")return checkins.filter(c=>allVenues.find(v=>v.id===c.venueId)?.c==="Суши-бар").length;
-    if(k==="cat_hink_1"||k==="cat_hink_3")return new Set(checkins.filter(c=>allVenues.find(v=>v.id===c.venueId)?.c==="Хинкальная").map(c=>c.venueId)).size;
-    if(k==="early_bird")return checkins.filter(c=>{const h=parseInt(c.time?.split(":")[0]||"12");return h<10;}).length>0?1:0;
-    if(k==="night_owl")return checkins.filter(c=>{const h=parseInt(c.time?.split(":")[0]||"12");return h>=23;}).length>0?1:0;
-    return 0;
-  };
-
-  // для каждой цепочки показываем текущий активный шаг
-  const computedAchs=ACH_CHAINS.map(chain=>{
-    let activeStep=chain.steps[0];
-    for(const step of chain.steps){
-      const p=getProgress(step.k);
-      if(p>=step.t){
-        // шаг выполнен — берём следующий если есть
-        const next=chain.steps[chain.steps.indexOf(step)+1];
-        if(next)activeStep=next;
-        else{activeStep={...step,p:step.t,ok:true};break;}
-      } else {
-        activeStep=step;break;
-      }
-    }
-    const p=getProgress(activeStep.k);
-    return{...activeStep,p:Math.min(p,activeStep.t),ok:p>=activeStep.t};
+  const computedAchs=buildAchievementState(ACHIEVEMENT_CHAINS,{
+    visitedIds,
+    checkins,
+    allVenues,
+    customVenues,
+    wishVenues,
   });
 
   const TAB_ICONS={map:"📍",wishlist:"📌",checkins:"✅",top:"🏆",profile:"👤"};
@@ -1038,7 +720,7 @@ html,body,#root{height:100%;overflow:hidden}
         {/* Панель заведения — полноэкранная шторка */}
         {sv&&allVenues.find(v=>v.id===sv.id)&&(()=>{
           const visited=visitedIds.has(String(sv.id));
-          const col=VENUE_COLOR(visited);
+          const col=getVenueColor(visited);
           const wished=wishVenues.find(w=>w.id===sv.id);
           const myci=checkins.filter(c=>c.venueId===sv.id);
           return(
@@ -1072,12 +754,12 @@ html,body,#root{height:100%;overflow:hidden}
               </div>
               {sv.ig&&(
                 <div style={{padding:"0 14px 10px"}}>
-                  <div onClick={()=>{const a=document.createElement("a");a.href=`https://instagram.com/${sv.ig}`;a.target="_blank";a.rel="noreferrer";document.body.appendChild(a);a.click();document.body.removeChild(a);}}
-                    style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,background:"rgba(192,80,240,.1)",border:"1px solid rgba(192,80,240,.25)",color:"#c080f0",cursor:"pointer"}}>
+                  <a href={getInstagramUrl(sv.ig)}
+                    style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,background:"rgba(192,80,240,.1)",border:"1px solid rgba(192,80,240,.25)",color:"#c080f0",cursor:"pointer",textDecoration:"none"}}>
                     <span style={{fontSize:18}}>📷</span>
                     <div><div style={{fontSize:12,fontWeight:800,fontFamily:"'Nunito'"}}>@{sv.ig}</div><div style={{fontSize:9,color:"rgba(192,80,240,.7)"}}>Instagram</div></div>
                     <span style={{marginLeft:"auto"}}>→</span>
-                  </div>
+                  </a>
                 </div>
               )}
               {customLabels.length>0&&(
@@ -1151,7 +833,7 @@ html,body,#root{height:100%;overflow:hidden}
                     {c.review&&<div className="ci-review">«{c.review}»</div>}
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',parseInt(c.id));const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});setConfirmDeleteCheckin(null);}}
+                        <button onClick={()=>deleteUserCheckin(c)}
                           style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
@@ -1219,7 +901,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <input className="srch" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:30}}/>
                 </div>
                 <div className="chips" onMouseDown={e=>{const el=e.currentTarget;el.classList.add("dragging");const sx=e.pageX-el.offsetLeft,sl=el.scrollLeft;const mv=ev=>{el.scrollLeft=sl-(ev.pageX-el.offsetLeft-sx);};const up=()=>{el.classList.remove("dragging");window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}>
-                  {CATS.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
+                  {CATEGORIES.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
                   {customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
                   <button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>
                 </div>
@@ -1236,7 +918,7 @@ html,body,#root{height:100%;overflow:hidden}
                 <div className="sc">
                   {fl.map(v=>{
                     const visited=visitedIds.has(String(v.id));
-                    const col=VENUE_COLOR(visited);
+                    const col=getVenueColor(visited);
                     return(
                       <div key={v.id} className="vi" onClick={()=>{setSv(v);mapInst.current?.flyTo([v.lat,v.lng],16,{duration:.5})}}>
                         <div className="vi-strip" style={{background:col.accent}}/>
@@ -1283,7 +965,7 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                     {confirmDeleteCheckin===c.id?(
                       <div style={{display:"flex",gap:4,flexShrink:0}}>
-                        <button onClick={async()=>{if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}await supabase.from('checkins').delete().eq('id',parseInt(c.id));const u=checkins.filter(ch=>ch.id!==c.id);setCheckins(u);setConfirmDeleteCheckin(null);}}
+                        <button onClick={()=>deleteUserCheckin(c)}
                           style={{width:40,height:20,borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,cursor:"pointer"}}>да</button>
                         <button onClick={()=>setConfirmDeleteCheckin(null)}
                           style={{width:40,height:20,borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,cursor:"pointer"}}>нет</button>
@@ -1321,7 +1003,7 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="prof-title">Lv.{user.level} · {user.title}</div>
                   <div className="prof-xp-bar"><div className="prof-xp-fill" style={{width:`${(user.xp/user.nxp)*100}%`}}/></div>
                   <div className="prof-xp-lbl">{user.xp} / {user.nxp} XP</div>
-                  <button onClick={()=>supabase.auth.signOut()}
+                  <button onClick={()=>authService.signOut()}
                     style={{marginTop:12,padding:"6px 20px",borderRadius:8,border:"1px solid #333",background:"none",color:"var(--txt3)",fontFamily:"'Nunito'",fontWeight:700,fontSize:11,cursor:"pointer"}}>
                     Выйти из аккаунта
                   </button>
@@ -1339,7 +1021,11 @@ html,body,#root{height:100%;overflow:hidden}
                     <div className="ach-cnt">{a.ok?"✅":`${a.p}/${a.t}`}</div>
                   </div>
                 ))}
-                {isAdmin&&<AdminPanel/>}
+                {isAdmin&&<AdminPanel
+                  catalogVenues={catalogVenues}
+                  adminUserId={currentUser?.id}
+                  onCatalogVenueCreated={(venue)=>setCatalogVenues(prev=>prev.some(v=>v.id===venue.id)?prev:[...prev,venue])}
+                />}
               </div>
             )}
           </div>
@@ -1371,7 +1057,7 @@ html,body,#root{height:100%;overflow:hidden}
           <div className="hav-icon">{user.name[0]}</div>
           <div><div className="hav-name">{user.name}</div><div className="hav-lvl">Lv.{user.level} {user.title}</div></div>
         </div>
-        <button onClick={()=>supabase.auth.signOut()} title="Выйти"
+        <button onClick={()=>authService.signOut()} title="Выйти"
           style={{background:"none",border:"1px solid #222820",borderRadius:8,color:"#5a5648",fontSize:11,cursor:"pointer",padding:"4px 8px",fontFamily:"'Nunito'",fontWeight:700}}>
           ⎋
         </button>
@@ -1414,7 +1100,7 @@ html,body,#root{height:100%;overflow:hidden}
                   window.addEventListener("mousemove",onMove);
                   window.addEventListener("mouseup",onUp);
                 }}>
-                {CATS.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
+                {CATEGORIES.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
                 {customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
                 <button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>
               </div>
@@ -1431,7 +1117,7 @@ html,body,#root{height:100%;overflow:hidden}
               <div className="sc">
                 {fl.map(v=>{
                   const visited=visitedIds.has(String(v.id));
-                  const col=VENUE_COLOR(visited);
+                  const col=getVenueColor(visited);
                   return(
                     <div key={v.id} className="vi" onClick={()=>{setSv(v);mapInst.current?.flyTo([v.lat,v.lng],16,{duration:.5})}}>
                       <div className="vi-strip" style={{background:col.accent}}/>
@@ -1511,12 +1197,7 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                     {c.review&&<div className="ck-review">«{c.review}»</div>}
                   </div>
-                  <button onClick={async()=>{
-                    if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
-                    await supabase.from('checkins').delete().eq('id',parseInt(c.id));
-                    const updated=checkins.filter(ch=>ch.id!==c.id);
-                    setCheckins(updated);
-                  }} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
+                  <button onClick={()=>deleteUserCheckin(c)} style={{flexShrink:0,marginTop:2,width:20,height:20,borderRadius:"50%",border:"1px solid var(--border)",background:"none",color:"var(--txt3)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>×</button>
                 </div>
               ))}
             </div>
@@ -1549,7 +1230,7 @@ html,body,#root{height:100%;overflow:hidden}
                 <div className="prof-title">Lv.{user.level} · {user.title}</div>
                 <div className="prof-xp-bar"><div className="prof-xp-fill" style={{width:`${(user.xp/user.nxp)*100}%`}}/></div>
                 <div className="prof-xp-lbl">{user.xp} / {user.nxp} XP</div>
-                <button onClick={()=>supabase.auth.signOut()}
+                <button onClick={()=>authService.signOut()}
                   style={{marginTop:12,padding:"6px 20px",borderRadius:8,border:"1px solid #333",background:"none",color:"var(--txt3)",fontFamily:"'Nunito'",fontWeight:700,fontSize:11,cursor:"pointer"}}>
                   Выйти из аккаунта
                 </button>
@@ -1579,7 +1260,11 @@ html,body,#root{height:100%;overflow:hidden}
                   <div className="ach-cnt">{a.ok?"✅":`${a.p}/${a.t}`}</div>
                 </div>
               ))}
-              {isAdmin&&<AdminPanel/>}
+              {isAdmin&&<AdminPanel
+                catalogVenues={catalogVenues}
+                adminUserId={currentUser?.id}
+                onCatalogVenueCreated={(venue)=>setCatalogVenues(prev=>prev.some(v=>v.id===venue.id)?prev:[...prev,venue])}
+              />}
             </div>
           )}
         </div>
@@ -1594,7 +1279,7 @@ html,body,#root{height:100%;overflow:hidden}
           {/* VENUE DETAIL PANEL */}
           {sv&&allVenues.find(v=>v.id===sv.id)&&(()=>{
             const visited=visitedIds.has(String(sv.id));
-            const col=VENUE_COLOR(visited);
+            const col=getVenueColor(visited);
             const wished=wishVenues.find(w=>w.id===sv.id);
             const myci=checkins.filter(c=>c.venueId===sv.id);
             return(
@@ -1625,15 +1310,15 @@ html,body,#root{height:100%;overflow:hidden}
                 </div>
                 {sv.ig&&(
                   <div style={{padding:"0 14px 10px"}}>
-                    <div onClick={()=>{const a=document.createElement("a");a.href=`https://instagram.com/${sv.ig}`;a.target="_blank";a.rel="noreferrer";document.body.appendChild(a);a.click();document.body.removeChild(a);}}
-                      style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,background:"rgba(192,80,240,.1)",border:"1px solid rgba(192,80,240,.25)",color:"#c080f0",cursor:"pointer"}}>
+                    <a href={getInstagramUrl(sv.ig)}
+                      style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:10,background:"rgba(192,80,240,.1)",border:"1px solid rgba(192,80,240,.25)",color:"#c080f0",cursor:"pointer",textDecoration:"none"}}>
                       <span style={{fontSize:18}}>📷</span>
                       <div>
                         <div style={{fontSize:12,fontWeight:800,fontFamily:"'Nunito'"}}>@{sv.ig}</div>
                         <div style={{fontSize:9,color:"rgba(192,80,240,.7)"}}>Instagram</div>
                       </div>
                       <span style={{marginLeft:"auto",fontSize:12}}>→</span>
-                    </div>
+                    </a>
                   </div>
                 )}
                 {/* VENUE LABELS */}
@@ -1730,13 +1415,7 @@ html,body,#root{height:100%;overflow:hidden}
                       <div key={i} style={{width:96,height:96,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)",cursor:"pointer"}}
                         onClick={()=>setPhotoViewer({photos:menuPhotos[sv.id],index:i})}>
                         <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                        <button onClick={async e=>{
-                          e.stopPropagation();
-                          const photo=menuPhotos[sv.id][i];
-                          if(photo.path){await supabase.storage.from('menu-photos').remove([photo.path]);}
-                          const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
-                          setMenuPhotos(updated);saveMenuPhotos(updated);
-                        }} style={{position:"absolute",top:4,right:4,width:20,height:20,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800}}>×</button>
+                        <button onClick={async e=>{e.stopPropagation();await removeMenuPhoto(sv.id,i);}} style={{position:"absolute",top:4,right:4,width:20,height:20,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800}}>×</button>
                       </div>
                     ))}
                     <div onClick={()=>setShowMenuModal(true)} style={{width:96,height:96,borderRadius:8,background:"var(--bg3)",border:"2px dashed var(--border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:22,color:"var(--txt3)"}}>+</div>
@@ -1779,14 +1458,7 @@ html,body,#root{height:100%;overflow:hidden}
                       {c.review&&<div className="ci-review">«{c.review}»</div>}
                       {confirmDeleteCheckin===c.id?(
                         <div style={{display:"flex",gap:6,marginTop:6,justifyContent:"flex-end"}}>
-                          <button onClick={async()=>{
-                            if(c.photoKey){try{await supabase.storage.from("checkin-photos").remove([c.photoKey]);}catch(e){}}
-                            await supabase.from('checkins').delete().eq('id',parseInt(c.id));
-                            const updated=checkins.filter(ch=>ch.id!==c.id);
-                            setCheckins(updated);
-                            setCheckinPhotos(p=>{const n={...p};delete n[c.id];return n;});
-                            setConfirmDeleteCheckin(null);
-                          }} style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
+                          <button onClick={()=>deleteUserCheckin(c)} style={{padding:"2px 10px",borderRadius:6,border:"none",background:"#c03030",color:"#fff",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Удалить</button>
                           <button onClick={()=>setConfirmDeleteCheckin(null)}
                             style={{padding:"2px 10px",borderRadius:6,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt2)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>Отмена</button>
                         </div>
@@ -1949,19 +1621,8 @@ html,body,#root{height:100%;overflow:hidden}
                     const files=Array.from(e.target.files);
                     if(!files.length)return;
                     setMenuUploading(true);
-                    const now=new Date();
-                    const newPhotos=[];
-                    for(const file of files){
-                      const path=`${sv.id}/${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
-                      const{error}=await supabase.storage.from('menu-photos').upload(path,file,{upsert:true});
-                      if(error){alert(`Ошибка загрузки: ${error.message}`);continue;}
-                      const{data}=supabase.storage.from('menu-photos').getPublicUrl(path);
-                      const{data:row}=await supabase.from('menu_photos').insert({
-                        venue_id:sv.id,user_id:currentUser?.id,
-                        photo_url:data.publicUrl,photo_path:path,status:'pending'
-                      }).select().single();
-                      newPhotos.push({src:data.publicUrl,path,id:row?.id,date:now.toLocaleDateString("ru-RU"),status:'pending'});
-                    }
+                    const { uploaded:newPhotos, errors }=await menuPhotoService.uploadMenuPhotos({venueId:sv.id,userId:currentUser?.id,files});
+                    errors.forEach(error=>alert(`Ошибка загрузки: ${error.message}`));
                     setMenuUploading(false);
                     if(newPhotos.length){
                       const existing=menuPhotos[sv.id]||[];
@@ -1992,13 +1653,7 @@ html,body,#root{height:100%;overflow:hidden}
                     <div key={i} style={{width:90,height:90,borderRadius:8,overflow:"hidden",position:"relative",border:"1px solid var(--border)",cursor:"pointer"}}
                       onClick={()=>setPhotoViewer({photos:menuPhotos[sv.id],index:i})}>
                       <img src={p.src} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                      <button onClick={async e=>{
-                        e.stopPropagation();
-                        const photo=menuPhotos[sv.id][i];
-                        if(photo.path){await supabase.storage.from('menu-photos').remove([photo.path]);}
-                        const updated={...menuPhotos,[sv.id]:menuPhotos[sv.id].filter((_,j)=>j!==i)};
-                        setMenuPhotos(updated);saveMenuPhotos(updated);
-                      }} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                      <button onClick={async e=>{e.stopPropagation();await removeMenuPhoto(sv.id,i);}} style={{position:"absolute",top:3,right:3,width:18,height:18,borderRadius:"50%",background:"rgba(180,30,30,.85)",border:"none",color:"#fff",fontSize:10,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                     </div>
                   ))}
                 </div>
@@ -2083,6 +1738,7 @@ html,body,#root{height:100%;overflow:hidden}
               {k:"a",label:"Адрес",ph:"ул. Коста, 10"},
               {k:"s",label:"Кухня / описание",ph:"Итальянская, гриль..."},
               {k:"r",label:"Рейтинг (0–5)",ph:"4.5"},
+              {k:"ig",label:"Instagram",ph:"bez @, например: cuprum_restaurant"},
             ].map(f=>(
               <div key={f.k} style={{marginBottom:8}}>
                 <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>{f.label}</div>
@@ -2140,38 +1796,43 @@ html,body,#root{height:100%;overflow:hidden}
             {!newV.lat&&<div style={{fontSize:9,color:"var(--txt3)",textAlign:"center",marginBottom:10}}>или найди через поиск выше</div>}
 
             <button
-              style={{width:"100%",padding:11,borderRadius:10,border:"none",background:"linear-gradient(90deg,var(--gold),var(--gold2))",color:"var(--bg)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer",marginBottom:7,opacity:(!newV.n||!newV.lat)?0.5:1}}
-              onClick={()=>{
+              disabled={venueSubmitting}
+              style={{width:"100%",padding:11,borderRadius:10,border:"none",background:"linear-gradient(90deg,var(--gold),var(--gold2))",color:"var(--bg)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer",marginBottom:7,opacity:(!newV.n||!newV.lat||venueSubmitting)?0.5:1}}
+              onClick={async()=>{
                 if(!newV.n){alert("Введи название заведения");return;}
                 if(!newV.lat){alert("Поставь метку на карте");return;}
                 const CAT_ICON={Ресторан:"🏛️",Кафе:"☕",Бар:"🍺",Пиццерия:"🍕",Хинкальная:"🥟",Бургерная:"🍔",Фастфуд:"🌯","Гриль-бар":"🥩","Суши-бар":"🍣"};
                 const venue={
-                  id:`custom_${Date.now()}`,
                   n:newV.n,c:newV.c,s:newV.s,a:newV.a,
                   i:CAT_ICON[newV.c]||"📍",
                   r:parseFloat(newV.r)||0,rc:0,
+                  ig:newV.ig.trim().replace(/^@/,""),
                   lat:parseFloat(newV.lat),lng:parseFloat(newV.lng),
-                  custom:true,
                 };
-                const updated=[...customVenues,venue];
-                setCustomVenues(updated);saveCustomVenues(updated);
-                if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
-                setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
-                setGeoSearch("");
-                setShowAddVenue(false);
-                if(mapInst.current){
-                  mapInst.current.getContainer().style.cursor="";
-                  mapInst.current.flyTo([venue.lat,venue.lng],16,{duration:.8});
+                setVenueSubmitting(true);
+                try{
+                  await venueSubmissionService.submitVenue(currentUser.id,venue);
+                  alert("Заявка отправлена на модерацию");
+                  if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
+                  setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
+                  setGeoSearch("");
+                  setShowAddVenue(false);
+                  if(mapInst.current)mapInst.current.getContainer().style.cursor="";
+                }catch(e){
+                  console.error(e);
+                  alert(`Не удалось отправить заявку: ${e?.message || "неизвестная ошибка"}`);
+                }finally{
+                  setVenueSubmitting(false);
                 }
               }}>
-              ✓ Добавить на карту
+              {venueSubmitting?"Отправляем...":"✓ Отправить на модерацию"}
             </button>
             <button style={{width:"100%",padding:11,borderRadius:10,border:"none",background:"var(--bg3)",color:"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer"}}
               onClick={()=>{
                 setShowAddVenue(false);
                 if(tempMarkerRef.current){tempMarkerRef.current.remove();tempMarkerRef.current=null;}
                 if(mapInst.current)mapInst.current.getContainer().style.cursor="";
-                setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",lat:"",lng:""});
+                setNewV({n:"",a:"",c:"Ресторан",s:"",r:"",ig:"",lat:"",lng:""});
                 setGeoSearch("");
               }}>Отмена</button>
           </div>
@@ -2228,11 +1889,12 @@ html,body,#root{height:100%;overflow:hidden}
 
   </>);}
 
-function AdminPanel(){
+function AdminPanel({ catalogVenues, adminUserId, onCatalogVenueCreated }){
   const[adminTab,setAdminTab]=useState("users");
   const[users,setUsers]=useState([]);
   const[allCheckins,setAllCheckins]=useState([]);
   const[pendingMenus,setPendingMenus]=useState([]);
+  const[pendingVenueSubmissions,setPendingVenueSubmissions]=useState([]);
   const[loading,setLoading]=useState(false);
 
   useEffect(()=>{
@@ -2242,52 +1904,50 @@ function AdminPanel(){
   const loadData=async()=>{
     setLoading(true);
     if(adminTab==="users"){
-      const{data}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
-      setUsers(data||[]);
+      setUsers(await profileService.listProfiles());
     }
     if(adminTab==="checkins"){
-      const{data}=await supabase.from("fogeat_data").select("*").like("key","fogeat-checkins-%");
-      const all=[];
-      (data||[]).forEach(row=>{
-        try{
-          const uid=row.key.replace("fogeat-checkins-","");
-          const items=JSON.parse(row.value);
-          items.forEach(c=>all.push({...c,uid}));
-        }catch(e){}
-      });
-      setAllCheckins(all.sort((a,b)=>b.id-a.id));
+      setAllCheckins(await adminService.listLegacyCheckins());
     }
     if(adminTab==="menu"){
-      const{data}=await supabase.from('menu_photos').select('*').eq('status','pending').order('created_at',{ascending:false});
-      setPendingMenus(data||[]);
+      setPendingMenus(await menuPhotoService.listPendingMenuPhotos());
+    }
+    if(adminTab==="venues"){
+      setPendingVenueSubmissions(await venueSubmissionService.listPendingSubmissions());
     }
     setLoading(false);
   };
 
   const approveMenu=async(photo)=>{
-    await supabase.from('menu_photos').update({status:'approved'}).eq('id',photo.id);
+    await menuPhotoService.approveMenuPhoto(photo.id);
     setPendingMenus(p=>p.filter(m=>m.id!==photo.id));
   };
 
   const rejectMenu=async(photo)=>{
-    await supabase.storage.from('menu-photos').remove([photo.photo_path]);
-    await supabase.from('menu_photos').delete().eq('id',photo.id);
+    await menuPhotoService.rejectMenuPhoto(photo);
     setPendingMenus(p=>p.filter(m=>m.id!==photo.id));
   };
 
+  const approveVenueSubmission=async(submission)=>{
+    const venue=await venueSubmissionService.approveSubmission(submission,adminUserId);
+    onCatalogVenueCreated?.(venue);
+    setPendingVenueSubmissions(p=>p.filter(s=>s.id!==submission.id));
+  };
+
+  const rejectVenueSubmission=async(submission)=>{
+    await venueSubmissionService.rejectSubmission(submission.id,adminUserId);
+    setPendingVenueSubmissions(p=>p.filter(s=>s.id!==submission.id));
+  };
+
   const deleteCheckin=async(checkin)=>{
-    const key=`fogeat-checkins-${checkin.uid}`;
-    const{data}=await supabase.from("fogeat_data").select("value").eq("key",key).single();
-    if(!data)return;
-    const items=JSON.parse(data.value).filter(c=>c.id!==checkin.id);
-    await supabase.from("fogeat_data").update({value:JSON.stringify(items)}).eq("key",key);
-    if(checkin.photoKey){try{await supabase.storage.from("checkin-photos").remove([checkin.photoKey]);}catch(e){}}
+    const deleted=await adminService.deleteLegacyCheckin(checkin);
+    if(!deleted)return;
     setAllCheckins(p=>p.filter(c=>!(c.id===checkin.id&&c.uid===checkin.uid)));
   };
 
   const banUser=async(userId)=>{
     if(!confirm("Удалить пользователя?"))return;
-    await supabase.from("profiles").delete().eq("id",userId);
+    await profileService.deleteProfile(userId);
     setUsers(p=>p.filter(u=>u.id!==userId));
   };
 
@@ -2295,7 +1955,7 @@ function AdminPanel(){
     <div style={{marginTop:16}}>
       <div className="sec-hdr" style={{color:"#e8a838"}}>⚙️ Панель администратора</div>
       <div style={{display:"flex",gap:0,margin:"8px 14px",background:"var(--bg3)",borderRadius:10,padding:3}}>
-        {[["users","👥 Пользователи"],["checkins","📸 Чекины"],["menu","🍽️ Меню"]].map(([k,l])=>(
+        {[["users","👥 Пользователи"],["checkins","📸 Чекины"],["menu","🍽️ Меню"],["venues","📍 Заявки"]].map(([k,l])=>(
           <button key={k} onClick={()=>setAdminTab(k)}
             style={{flex:1,padding:"6px",borderRadius:8,border:"none",background:adminTab===k?"var(--grn)":"transparent",color:adminTab===k?"#fff":"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:11,cursor:"pointer"}}>
             {l}
@@ -2357,7 +2017,7 @@ function AdminPanel(){
           {pendingMenus.map(photo=>(
             <div key={photo.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
               <div style={{fontSize:11,color:"var(--txt3)",marginBottom:6}}>
-                Заведение: <span style={{color:"var(--txt)",fontWeight:800}}>{(()=>{const v=V.find(v=>v.id===photo.venue_id);return v?v.n:`ID ${photo.venue_id}`;})()}</span> · {new Date(photo.created_at).toLocaleDateString("ru-RU")}
+                Заведение: <span style={{color:"var(--txt)",fontWeight:800}}>{(()=>{const v=catalogVenues.find(v=>v.id===photo.venue_id);return v?v.n:`ID ${photo.venue_id}`;})()}</span> · {new Date(photo.created_at).toLocaleDateString("ru-RU")}
               </div>
               <img src={photo.photo_url} alt="" style={{width:"100%",borderRadius:8,marginBottom:8,maxHeight:300,objectFit:"contain",background:"var(--bg3)"}}/>
               <div style={{display:"flex",gap:8}}>
@@ -2368,6 +2028,41 @@ function AdminPanel(){
                 <button onClick={()=>rejectMenu(photo)}
                   style={{flex:1,padding:8,borderRadius:8,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
                   ✗ Отклонить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading&&adminTab==="venues"&&(
+        <div style={{padding:"0 14px"}}>
+          {pendingVenueSubmissions.length===0&&<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Нет заявок на заведения</div>}
+          {pendingVenueSubmissions.map(submission=>(
+            <div key={submission.id} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:8}}>
+                <div style={{width:34,height:34,borderRadius:10,background:"var(--bg3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>{submission.icon||"📍"}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:900,color:"var(--txt)"}}>{submission.name}</div>
+                  <div style={{fontSize:10,color:"var(--txt3)"}}>
+                    {submission.category}{submission.subcategory?` · ${submission.subcategory}`:""} · uid:{submission.user_id?.slice(0,8)}…
+                  </div>
+                  {submission.address&&<div style={{fontSize:10,color:"var(--txt2)",marginTop:2}}>{submission.address}</div>}
+                  {submission.instagram&&<div style={{fontSize:10,color:"var(--txt2)",marginTop:2}}>Instagram: @{submission.instagram}</div>}
+                  <div style={{fontSize:10,color:"var(--txt3)",marginTop:2}}>
+                    {Number(submission.lat).toFixed(5)}, {Number(submission.lng).toFixed(5)}
+                    {submission.rating>0?` · ★ ${submission.rating}`:""}
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>approveVenueSubmission(submission)}
+                  style={{flex:1,padding:8,borderRadius:8,border:"none",background:"var(--grn)",color:"#fff",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                  ✓ Одобрить
+                </button>
+                <button onClick={()=>rejectVenueSubmission(submission)}
+                  style={{flex:1,padding:8,borderRadius:8,border:"1px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.08)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+                  × Отклонить
                 </button>
               </div>
             </div>
@@ -2385,28 +2080,10 @@ function TopUsers({currentUserId,onViewProfile}){
 
   useEffect(()=>{
     const load=async()=>{
-      // загружаем топ пользователей по количеству чекинов
-      const{data:counts}=await supabase
-        .from('checkins')
-        .select('user_id')
-        .order('user_id');
-      
-      // считаем чекины по user_id
-      const countMap={};
-      (counts||[]).forEach(r=>{countMap[r.user_id]=(countMap[r.user_id]||0)+1;});
-      
-      // загружаем профили
-      const{data:profiles}=await supabase.from('profiles').select('id,username,role');
-      
-      const ranked=(profiles||[])
-        .map(p=>({...p,count:countMap[p.id]||0}))
-        .sort((a,b)=>b.count-a.count);
-      setUsers(ranked);
+      setUsers(await profileService.listRankedProfiles());
 
-      // загружаем избранных
       if(currentUserId){
-        const{data:favs}=await supabase.from('favorites').select('favorite_user_id').eq('user_id',currentUserId);
-        setFavorites((favs||[]).map(f=>f.favorite_user_id));
+        setFavorites(await favoriteService.listFavoriteUserIds(currentUserId));
       }
       setLoading(false);
     };
@@ -2416,10 +2093,10 @@ function TopUsers({currentUserId,onViewProfile}){
   const toggleFavorite=async(userId)=>{
     if(!currentUserId||userId===currentUserId)return;
     if(favorites.includes(userId)){
-      await supabase.from('favorites').delete().eq('user_id',currentUserId).eq('favorite_user_id',userId);
+      await favoriteService.removeFavorite(currentUserId,userId);
       setFavorites(f=>f.filter(id=>id!==userId));
     } else {
-      await supabase.from('favorites').insert({user_id:currentUserId,favorite_user_id:userId});
+      await favoriteService.addFavorite(currentUserId,userId);
       setFavorites(f=>[...f,userId]);
     }
   };
@@ -2460,8 +2137,8 @@ function UserCheckins({userId,username}){
   const[loading,setLoading]=useState(true);
 
   useEffect(()=>{
-    supabase.from('checkins').select('*').eq('user_id',userId).order('created_at',{ascending:false})
-      .then(({data})=>{setCheckins(data||[]);setLoading(false);});
+    checkinService.listUserCheckinRows(userId)
+      .then(data=>{setCheckins(data);setLoading(false);});
   },[userId]);
 
   if(loading)return<div style={{textAlign:"center",padding:24,color:"var(--txt3)",fontSize:12}}>Загрузка...</div>;

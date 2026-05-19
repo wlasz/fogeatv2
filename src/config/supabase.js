@@ -1,0 +1,5 @@
+const FALLBACK_SUPABASE_URL = 'https://tijsmxzbigfaybjdwzat.supabase.co'
+const FALLBACK_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpanNteHpiaWdmYXliamR3emF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyOTIxMzgsImV4cCI6MjA5MDg2ODEzOH0.1GkyokqFsu0GvRPg-k_6MIG8IF0vs76O83jNDifsvNo'
+
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_SUPABASE_ANON_KEY
