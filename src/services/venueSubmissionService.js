@@ -50,7 +50,7 @@ export const venueSubmissionService = {
     return data || []
   },
 
-  async approveSubmission(submission, adminUserId) {
+  async approveSubmission(submission) {
     const { data: latestVenue } = await supabase
       .from('venues')
       .select('id')
@@ -74,15 +74,12 @@ export const venueSubmissionService = {
 
     if (error) throw error
 
-    await supabase
+    const { error: cleanupError } = await supabase
       .from('venue_submissions')
-      .update({
-        status: 'approved',
-        approved_venue_id: venue.id,
-        reviewed_by: adminUserId,
-        reviewed_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('id', submission.id)
+
+    if (cleanupError) throw cleanupError
 
     return mapVenueRow(venue)
   },
