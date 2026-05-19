@@ -6,6 +6,7 @@ import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements
 import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
 import { LIMITS, LIMIT_ERROR_CODES } from './domain/limits.js';
 import { INITIAL_USER } from './domain/user.js';
+import { VENUE_TAG_GROUPS, getSuggestedVenueTags, hasVenueTag, mergeVenueTags, toggleVenueTag } from './domain/venueTags.js';
 import { adminService } from './services/adminService.js';
 import { appDataService } from './services/appDataService.js';
 import { authService } from './services/authService.js';
@@ -2024,6 +2025,19 @@ html,body,#root{height:100%;overflow:hidden}
 
 function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
   const inputStyle={width:"100%",padding:"8px 10px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:8,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none"};
+  const suggestedTags=getSuggestedVenueTags(venue.c);
+  const updateTags=(nextValue)=>onChange({s:nextValue});
+  const tagButtonStyle=(selected)=>({
+    padding:"4px 9px",
+    borderRadius:12,
+    border:`1.5px solid ${selected?"var(--gold)":"var(--border)"}`,
+    background:selected?"rgba(232,168,56,.16)":"transparent",
+    color:selected?"var(--gold)":"var(--txt2)",
+    fontSize:10,
+    fontWeight:800,
+    cursor:"pointer",
+    fontFamily:"'Nunito'",
+  });
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2200,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}
@@ -2064,9 +2078,50 @@ function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
           </div>
 
           <div style={{marginBottom:8}}>
-            <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Теги / кухня</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:6}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)"}}>Теги / кухня</div>
+              <div style={{display:"flex",gap:5}}>
+                <button
+                  disabled={!suggestedTags.length}
+                  onClick={()=>updateTags(mergeVenueTags(venue.s,suggestedTags))}
+                  style={{padding:"3px 8px",borderRadius:7,border:"1px solid rgba(232,168,56,.35)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontSize:9,fontWeight:800,cursor:suggestedTags.length?"pointer":"default",fontFamily:"'Nunito'",opacity:suggestedTags.length?1:.45}}>
+                  заполнить
+                </button>
+                <button
+                  onClick={()=>updateTags("")}
+                  style={{padding:"3px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                  очистить
+                </button>
+              </div>
+            </div>
+
+            {suggestedTags.length>0&&(
+              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                {suggestedTags.map(tag=>(
+                  <button key={tag} onClick={()=>updateTags(toggleVenueTag(venue.s,tag))}
+                    style={tagButtonStyle(hasVenueTag(venue.s,tag))}>
+                    {hasVenueTag(venue.s,tag)?"✓ ":"+ "}{tag}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {VENUE_TAG_GROUPS.map(group=>(
+              <div key={group.title} style={{marginBottom:7}}>
+                <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",marginBottom:4,textTransform:"uppercase"}}>{group.title}</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {group.tags.map(tag=>(
+                    <button key={tag} onClick={()=>updateTags(toggleVenueTag(venue.s,tag))}
+                      style={tagButtonStyle(hasVenueTag(venue.s,tag))}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
             <input value={venue.s} onChange={e=>onChange({s:e.target.value})}
-              placeholder="Осетинская, завтраки, панорама"
+              placeholder="Можно поправить вручную: осетинская, завтраки, вид"
               style={inputStyle}/>
           </div>
 
