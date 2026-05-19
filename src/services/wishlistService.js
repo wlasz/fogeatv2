@@ -29,4 +29,39 @@ export const wishlistService = {
       )
     }
   },
+
+  async listWishDishes(userId) {
+    const { data } = await supabase
+      .from('wishlist_dishes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    return (data || []).map((item) => ({
+      venueId: item.venue_id,
+      dishId: item.dish_id,
+      v: item.venue_name,
+      d: item.dish_name,
+      e: item.dish_icon,
+      tag: item.dish_tag,
+    }))
+  },
+
+  async saveWishDishes(userId, wishDishes) {
+    await supabase.from('wishlist_dishes').delete().eq('user_id', userId)
+
+    if (wishDishes.length) {
+      await supabase.from('wishlist_dishes').insert(
+        wishDishes.map((dish) => ({
+          user_id: userId,
+          venue_id: dish.venueId,
+          dish_id: dish.dishId,
+          venue_name: dish.v,
+          dish_name: dish.d,
+          dish_icon: dish.e,
+          dish_tag: dish.tag || '',
+        })),
+      )
+    }
+  },
 }

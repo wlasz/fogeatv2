@@ -197,6 +197,7 @@ function FogEat({session}){
       if(data.profile?.username)setUser(u=>({...u,name:data.profile.username}));
       setCheckins(data.checkins);
       setWishVenues(data.wishVenues);
+      setWishDishes(data.wishDishes);
       setVenueNotes(data.venueNotes);
       setCustomLabels(data.customLabels);
       setVenueLabels(data.venueLabels);
@@ -241,7 +242,7 @@ function FogEat({session}){
 
   const saveWishVenues=async(data)=>wishlistService.saveWishVenues(uid,data);
 
-  const saveWishDishes=async()=>{}; // not migrated yet
+  const saveWishDishes=async(data)=>wishlistService.saveWishDishes(uid,data);
 
   const saveUser=async()=>{}; // XP/level are still in memory
 
@@ -436,6 +437,31 @@ function FogEat({session}){
   const removeWishVenue=(id)=>{
     const updated=wishVenues.filter(w=>w.id!==id);
     setWishVenues(updated);saveWishVenues(updated);
+  };
+
+  const hasWishDish=(venue,dish)=>wishDishes.some(w=>String(w.venueId)===String(venue.id)&&String(w.dishId)===String(dish.id));
+
+  const toggleWishDish=(venue,dish)=>{
+    if(hasWishDish(venue,dish)){
+      const updated=wishDishes.filter(w=>!(String(w.venueId)===String(venue.id)&&String(w.dishId)===String(dish.id)));
+      setWishDishes(updated);saveWishDishes(updated);
+      return;
+    }
+
+    const updated=[{
+      venueId:venue.id,
+      dishId:dish.id,
+      v:venue.n,
+      d:dish.nm,
+      e:dish.ph,
+      tag:dish.tg,
+    },...wishDishes];
+    setWishDishes(updated);saveWishDishes(updated);
+  };
+
+  const removeWishDish=(dish)=>{
+    const updated=wishDishes.filter(w=>!(String(w.venueId)===String(dish.venueId)&&String(w.dishId)===String(dish.dishId)));
+    setWishDishes(updated);saveWishDishes(updated);
   };
 
   const deleteUserCheckin=async(checkin)=>{
@@ -950,10 +976,13 @@ html,body,#root{height:100%;overflow:hidden}
 
             {tab==="wishlist"&&(
               <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
-                <div className="wl-tabs">{["venues","done"].map(k=><button key={k} className={`wl-tab ${wt===k?"a":""}`} onClick={()=>setWt(k)}>{k==="venues"?"📍 Места":"✅ Готово"}</button>)}</div>
+                <div className="wl-tabs">{["venues","dishes","done"].map(k=><button key={k} className={`wl-tab ${wt===k?"a":""}`} onClick={()=>setWt(k)}>{k==="venues"?"📍 Места":k==="dishes"?"🍽️ Блюда":"✅ Готово"}</button>)}</div>
                 <div className="sc">
                   {wt==="venues"&&(wishVenues.length===0?<div className="empty"><div className="empty-ico">📌</div><div className="empty-txt">Нет мест</div></div>:wishVenues.map((w,i)=>(
                     <div key={i} className="wi"><div className="wic">{w.c}</div><div className="wif"><div className="win">{w.n}</div></div><button className="wr" onClick={()=>removeWishVenue(w.id)}>×</button></div>
+                  )))}
+                  {wt==="dishes"&&(wishDishes.length===0?<div className="empty"><div className="empty-ico">🍽️</div><div className="empty-txt">Нет блюд</div></div>:wishDishes.map((w,i)=>(
+                    <div key={`${w.venueId}-${w.dishId}-${i}`} className="wi"><div className="wic">{w.e}</div><div className="wif"><div className="win">{w.d}</div><div className="wint">{w.v}{w.tag?` · ${w.tag}`:""}</div></div><button className="wr" onClick={()=>removeWishDish(w)}>×</button></div>
                   )))}
                   {wt==="done"&&checkins.slice(0,20).map((c,i)=>(
                     <div key={i} className="wi" style={{opacity:.7}}><div className="wic">✅</div><div className="wif"><div className="win" style={{textDecoration:"line-through"}}>{c.venueName}</div><div className="wint">{c.date}</div></div></div>
@@ -1160,9 +1189,9 @@ html,body,#root{height:100%;overflow:hidden}
           {tab==="wishlist"&&(
             <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
               <div className="wl-tabs">
-                {["venues","done"].map(k=>(
+                {["venues","dishes","done"].map(k=>(
                   <button key={k} className={`wl-tab ${wt===k?"a":""}`} onClick={()=>setWt(k)}>
-                    {k==="venues"?"📍 Места":"✅ Готово"}
+                    {k==="venues"?"📍 Места":k==="dishes"?"🍽️ Блюда":"✅ Готово"}
                   </button>
                 ))}
               </div>
@@ -1174,6 +1203,15 @@ html,body,#root{height:100%;overflow:hidden}
                     <div className="wic">{w.c}</div>
                     <div className="wif"><div className="win">{w.n}</div>{w.no&&<div className="wint">{w.no}</div>}</div>
                     <button className="wr" onClick={()=>removeWishVenue(w.id)}>×</button>
+                  </div>
+                )))}
+                {wt==="dishes"&&(wishDishes.length===0?(
+                  <div className="empty"><div className="empty-ico">🍽️</div><div className="empty-txt">Нет сохранённых блюд</div></div>
+                ):wishDishes.map((w,i)=>(
+                  <div key={`${w.venueId}-${w.dishId}-${i}`} className="wi">
+                    <div className="wic">{w.e}</div>
+                    <div className="wif"><div className="win">{w.d}</div><div className="wint">{w.v}{w.tag?` · ${w.tag}`:""}</div></div>
+                    <button className="wr" onClick={()=>removeWishDish(w)}>×</button>
                   </div>
                 )))}
                 {wt==="done"&&checkins.slice(0,20).map((c,i)=>(
@@ -1443,15 +1481,9 @@ html,body,#root{height:100%;overflow:hidden}
                         <div className="dt">{d.tg}</div>
                         <div className="ds"><span style={{color:"var(--gold)"}}>★ {d.rt}</span> · {d.pr}₽ · {d.rv} отз.</div>
                       </div>
-                      <button className={`wish-btn ${wishDishes.find(w=>w.d===d.nm)?"on":""}`}
-                        onClick={()=>{
-                          if(wishDishes.find(w=>w.d===d.nm)){
-                            const u=wishDishes.filter(w=>w.d!==d.nm);setWishDishes(u);saveWishDishes(u);
-                          }else{
-                            const u=[{v:sv.n,d:d.nm,e:d.ph},...wishDishes];setWishDishes(u);saveWishDishes(u);
-                          }
-                        }}>
-                        {wishDishes.find(w=>w.d===d.nm)?"✓":"+ Хочу"}
+                      <button className={`wish-btn ${hasWishDish(sv,d)?"on":""}`}
+                        onClick={()=>toggleWishDish(sv,d)}>
+                        {hasWishDish(sv,d)?"✓":"+ Хочу"}
                       </button>
                     </div>
                   ))}
