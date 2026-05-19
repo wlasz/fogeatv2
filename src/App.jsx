@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements.js';
 import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
@@ -122,7 +124,7 @@ function FogEat({session}){
   const uid=currentUser?.id||'anonymous';
   const[isAdmin,setIsAdmin]=useState(false);
   const mapRef=useRef(null),mapInst=useRef(null),markersRef=useRef([]);
-  const[lr,setLr]=useState(false);
+  const[mapReady,setMapReady]=useState(0);
   const[fontsReady,setFontsReady]=useState(true);
   const[isMobile,setIsMobile]=useState(()=>{try{return window.innerWidth<768;}catch(e){return true;}});
   const[sheetOpen,setSheetOpen]=useState(true);
@@ -211,8 +213,7 @@ function FogEat({session}){
   },[uid]);
 
   const placeTempMarker=(lat,lng)=>{
-    if(!mapInst.current||!window.L)return;
-    const L=window.L;
+    if(!mapInst.current)return;
     if(tempMarkerRef.current)tempMarkerRef.current.remove();
     const html=`<div style="width:28px;height:28px;border-radius:50%;background:#e8a838;border:3px solid #fff;box-shadow:0 0 0 2px #e8a838,0 4px 12px rgba(0,0,0,.5);cursor:move;display:flex;align-items:center;justify-content:center;font-size:14px">📍</div>`;
     const icon=L.divIcon({html,className:"",iconSize:[28,28],iconAnchor:[14,14]});
@@ -256,23 +257,30 @@ function FogEat({session}){
   },[sv,checkins]);
 
   useEffect(()=>{
-    if(!window.L){
-      const l=document.createElement("link");l.rel="stylesheet";l.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";document.head.appendChild(l);
-      const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";s.onload=()=>setLr(true);document.head.appendChild(s);
-    }else{setLr(true);}
-    // сплэш — ждём шрифты + минимум 1.2с
     const t=setTimeout(()=>setFontsReady(true),1500);
     try{document.fonts.ready.then(()=>{clearTimeout(t);setTimeout(()=>setFontsReady(true),200);});}catch(e){}
     return()=>clearTimeout(t);
   },[]);
 
   useEffect(()=>{
-    if(!lr||!mapRef.current||mapInst.current)return;
-    const L=window.L;
+    if(!mapRef.current)return;
+
+    if(mapInst.current){
+      mapInst.current.remove();
+      mapInst.current=null;
+      markersRef.current=[];
+    }
+
     const m=L.map(mapRef.current,{zoomControl:false,attributionControl:false}).setView([43.033,44.678],14);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(m);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      maxZoom:19,
+      updateWhenIdle:true,
+      keepBuffer:3,
+      crossOrigin:true,
+    }).addTo(m);
     L.control.zoom({position:"topright"}).addTo(m);
     mapInst.current=m;
+    setMapReady(v=>v+1);
     setTimeout(()=>m.invalidateSize(),100);
     setTimeout(()=>m.invalidateSize(),500);
     setTimeout(()=>m.invalidateSize(),1000);
@@ -283,9 +291,14 @@ function FogEat({session}){
       setPlacingMarker(false);
       setShowAddVenue(true);
     });
-  },[lr]);
+    return()=>{
+      m.remove();
+      if(mapInst.current===m)mapInst.current=null;
+      markersRef.current=[];
+    };
+  },[isMobile]);
 
-  useEffect(()=>{if(mapInst.current)setTimeout(()=>mapInst.current.invalidateSize(),310)},[sideOpen]);
+  useEffect(()=>{if(mapInst.current)setTimeout(()=>mapInst.current.invalidateSize(),310)},[sideOpen,sheetOpen,sheetHeight,sv,fontsReady]);
 
   const visitedIds=new Set(checkins.map(c=>String(c.venueId)));
   const deletedIds=new Set(customVenues.filter(v=>v.deleted).map(v=>String(v.id)));
@@ -296,8 +309,7 @@ function FogEat({session}){
   const mapVenues=filteredVenues;
 
   const um=useCallback(()=>{
-    if(!mapInst.current||!window.L)return;
-    const L=window.L;
+    if(!mapInst.current)return;
     markersRef.current.forEach(m=>m.remove());markersRef.current=[];
 
     // зелёный(5) → жёлтый(2.5) → красный(0.5) по рейтингу
@@ -357,7 +369,7 @@ function FogEat({session}){
     });
   },[mapVenues,visitedIds,wishVenues]);
 
-  useEffect(()=>{um()},[um,lr]);
+  useEffect(()=>{um()},[um,mapReady]);
 
   const doCheckin=async()=>{
     const venue=selectedVenueForCheckin||sv;
