@@ -6,7 +6,7 @@ import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements
 import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
 import { LIMITS, LIMIT_ERROR_CODES } from './domain/limits.js';
 import { INITIAL_USER } from './domain/user.js';
-import { VENUE_TAG_GROUPS, getSuggestedVenueTags, hasVenueTag, mergeVenueTags, toggleVenueTag } from './domain/venueTags.js';
+import { VENUE_TAG_GROUPS, getSuggestedVenueTags, hasVenueTag, mergeVenueTags, parseVenueTags, toggleVenueTag } from './domain/venueTags.js';
 import { adminService } from './services/adminService.js';
 import { appDataService } from './services/appDataService.js';
 import { authService } from './services/authService.js';
@@ -343,10 +343,46 @@ function FogEat({session}){
   const deletedIds=new Set(customVenues.filter(v=>v.deleted).map(v=>String(v.id)));
   const customVenueCount=customVenues.filter(v=>!v.deleted).length;
   const allVenues=[...catalogVenues.filter(v=>!deletedIds.has(String(v.id))),...customVenues.filter(v=>!v.deleted)];
+  const activeCategory=mm==="city"&&cf.startsWith("lbl_")?"all":cf;
 
-  const filteredVenues=filterVenues({venues:allVenues,search,category:cf,venueLabels});
+  const filteredVenues=filterVenues({venues:allVenues,search,category:activeCategory,venueLabels:mm==="my"?venueLabels:{}});
   const fl=sortVenues(filteredVenues,sortBy,venueRatings);
   const mapVenues=filteredVenues;
+
+  useEffect(()=>{
+    if(mm==="city"&&cf.startsWith("lbl_"))setCf("all");
+  },[mm,cf]);
+
+  const getPersonalVenueTags=(venueId)=>(
+    (venueLabels[String(venueId)]||[])
+      .map(labelId=>customLabels.find(label=>label.id===labelId))
+      .filter(Boolean)
+  );
+
+  const getVenueDisplayTags=(venue)=>(
+    mm==="my"
+      ? getPersonalVenueTags(venue.id).map(label=>({id:`personal_${label.id}`,label:`${label.emoji} ${label.name}`,color:label.color}))
+      : parseVenueTags(venue.s).map(tag=>({id:`city_${tag}`,label:tag}))
+  );
+
+  const getVenueSubtitle=(venue)=>{
+    const tagText=getVenueDisplayTags(venue).map(tag=>tag.label).join(" · ");
+    return tagText?`${venue.a} · ${tagText}`:venue.a;
+  };
+
+  const getVenueTagStyle=(tag)=>tag.color?{borderColor:tag.color,background:`${tag.color}22`,color:tag.color}:undefined;
+
+  const toggleVenuePersonalLabel=(venueId,labelId)=>{
+    const key=String(venueId);
+    const cur=venueLabels[key]||[];
+    const has=cur.includes(labelId);
+    const next=has?cur.filter(id=>id!==labelId):[...cur,labelId];
+    const updated={...venueLabels};
+    if(next.length)updated[key]=next;
+    else delete updated[key];
+    setVenueLabels(updated);
+    saveVenueLabels(updated);
+  };
 
   const um=useCallback(()=>{
     if(!mapInst.current)return;
@@ -407,7 +443,7 @@ function FogEat({session}){
       marker.on("click",()=>{setSv(v);mapInst.current.flyTo([v.lat,v.lng],16,{duration:.5})});
       markersRef.current.push(marker);
     });
-  },[mapVenues,visitedIds,wishVenues]);
+  },[mapVenues,visitedIds,wishVenues,mm,venueRatings]);
 
   useEffect(()=>{um()},[um,mapReady]);
 
@@ -819,7 +855,9 @@ html,body,#root{height:100%;overflow:hidden}
                     return <span className="vp-tag gold">★ {avg} · моя оценка</span>;
                   })()}
                   <span className="vp-tag">{sv.c}</span>
-                  {sv.s&&<span className="vp-tag">{sv.s}</span>}
+                  {getVenueDisplayTags(sv).map(tag=>(
+                    <span key={tag.id} className="vp-tag" style={getVenueTagStyle(tag)}>{tag.label}</span>
+                  ))}
                   {visited&&<span className="vp-tag grn">✓ Был</span>}
                 </div>
               </div>
@@ -839,21 +877,14 @@ html,body,#root{height:100%;overflow:hidden}
                   </a>
                 </div>
               )}
-              {customLabels.length>0&&(
-                <div style={{padding:"0 14px 10px"}}>
-                  <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:6,textTransform:"uppercase"}}>🏷️ Теги</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                    {customLabels.map(l=>{
-                      const has=(venueLabels[String(sv.id)]||[]).includes(l.id);
-                      return(
-                        <button key={l.id} style={{padding:"4px 10px",borderRadius:12,border:`1.5px solid ${has?l.color:"var(--border)"}`,background:has?`${l.color}22`:"transparent",color:has?l.color:"var(--txt3)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito'"}}
-                          onClick={()=>{const cur=venueLabels[String(sv.id)]||[];const updated={...venueLabels,[String(sv.id)]:has?cur.filter(x=>x!==l.id):[...cur,l.id]};setVenueLabels(updated);saveVenueLabels(updated);}}>
-                          {l.emoji} {l.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {mm==="my"&&(
+                <VenuePersonalTagsEditor
+                  venueId={sv.id}
+                  labels={customLabels}
+                  venueLabels={venueLabels}
+                  onToggle={toggleVenuePersonalLabel}
+                  onManage={()=>setShowLabelManager(true)}
+                />
               )}
               <div style={{padding:"0 14px 10px"}}>
                 <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:5,textTransform:"uppercase"}}>📝 Заметка</div>
@@ -897,7 +928,7 @@ html,body,#root{height:100%;overflow:hidden}
                   </div>
                 ):(
                   <>
-                    {isAdmin&&!sv.custom&&(
+                    {mm==="city"&&isAdmin&&!sv.custom&&(
                       <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(232,168,56,.45)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:7}}
                         onClick={()=>openAdminVenueEditor(sv)}>✎ Редактировать заведение</button>
                     )}
@@ -984,9 +1015,9 @@ html,body,#root{height:100%;overflow:hidden}
                   <input className="srch" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:30}}/>
                 </div>
                 <div className="chips" onMouseDown={e=>{const el=e.currentTarget;el.classList.add("dragging");const sx=e.pageX-el.offsetLeft,sl=el.scrollLeft;const mv=ev=>{el.scrollLeft=sl-(ev.pageX-el.offsetLeft-sx);};const up=()=>{el.classList.remove("dragging");window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}>
-                  {CATEGORIES.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
-                  {customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
-                  <button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>
+                  {CATEGORIES.map(c=><button key={c.k} className={`chip ${activeCategory===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
+                  {mm==="my"&&customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
+                  {mm==="my"&&<button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>}
                 </div>
                 <div style={{padding:"2px 12px 4px",fontSize:9,color:"var(--txt3)",fontWeight:700,display:"flex",justifyContent:"space-between"}}>
                   <span>{fl.length} заведений</span>
@@ -1006,7 +1037,7 @@ html,body,#root{height:100%;overflow:hidden}
                       <div key={v.id} className="vi" onClick={()=>{setSv(v);mapInst.current?.flyTo([v.lat,v.lng],16,{duration:.5})}}>
                         <div className="vi-strip" style={{background:col.accent}}/>
                         <div className="vi-icon" style={{background:col.bg}}>{v.i}</div>
-                        <div className="vi-info"><div className="vi-name">{v.n}</div><div className="vi-sub">{v.a}{v.s?` · ${v.s}`:""}</div></div>
+                        <div className="vi-info"><div className="vi-name">{v.n}</div><div className="vi-sub">{getVenueSubtitle(v)}</div></div>
                         <div className="vi-right">
                           {mm==="city"&&venueRatings[v.id]?.avg>0&&<div className="vi-rating">★ {venueRatings[v.id].avg}</div>}
                           {mm==="my"&&(()=>{const myR=checkins.filter(c=>c.venueId===v.id&&c.rating>0);if(!myR.length)return null;const avg=(myR.reduce((s,c)=>s+c.rating,0)/myR.length).toFixed(1);return<div className="vi-rating" style={{color:"var(--grn3)"}}>★ {avg}</div>;})()}
@@ -1186,9 +1217,9 @@ html,body,#root{height:100%;overflow:hidden}
                   window.addEventListener("mousemove",onMove);
                   window.addEventListener("mouseup",onUp);
                 }}>
-                {CATEGORIES.map(c=><button key={c.k} className={`chip ${cf===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
-                {customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
-                <button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>
+                {CATEGORIES.map(c=><button key={c.k} className={`chip ${activeCategory===c.k?"a":""}`} onClick={()=>setCf(c.k)}>{c.l}</button>)}
+                {mm==="my"&&customLabels.map(l=><button key={`lbl_${l.id}`} className={`chip ${cf===`lbl_${l.id}`?"a":""}`} onClick={()=>setCf(`lbl_${l.id}`)}>{l.emoji} {l.name}</button>)}
+                {mm==="my"&&<button className="chip" style={{borderStyle:"dashed",opacity:.7}} onClick={()=>setShowLabelManager(true)}>⚙️</button>}
               </div>
               <div style={{padding:"5px 12px 4px",fontSize:9,color:"var(--txt3)",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <span>{fl.length} {mm==="my"?"посещено":"заведений"}</span>
@@ -1210,7 +1241,7 @@ html,body,#root{height:100%;overflow:hidden}
                       <div className="vi-icon" style={{background:col.bg}}>{v.i}</div>
                       <div className="vi-info">
                         <div className="vi-name">{v.n}</div>
-                        <div className="vi-sub">{v.a}{v.s?` · ${v.s}`:""}</div>
+                        <div className="vi-sub">{getVenueSubtitle(v)}</div>
                       </div>
                       <div className="vi-right">
                         {mm==="city"&&venueRatings[v.id]?.avg>0&&<div className="vi-rating">★ {venueRatings[v.id].avg}</div>}
@@ -1393,7 +1424,9 @@ html,body,#root{height:100%;overflow:hidden}
                       return <span className="vp-tag gold">★ {avg} · моя оценка</span>;
                     })()}
                     <span className="vp-tag">{sv.c}</span>
-                    {sv.s&&<span className="vp-tag">{sv.s}</span>}
+                    {getVenueDisplayTags(sv).map(tag=>(
+                      <span key={tag.id} className="vp-tag" style={getVenueTagStyle(tag)}>{tag.label}</span>
+                    ))}
                     {visited&&<span className="vp-tag grn">✓ Ты здесь был</span>}
                   </div>
                 </div>
@@ -1416,27 +1449,14 @@ html,body,#root{height:100%;overflow:hidden}
                     </a>
                   </div>
                 )}
-                {/* VENUE LABELS */}
-                {customLabels.length>0&&(
-                  <div style={{padding:"0 14px 10px"}}>
-                    <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",marginBottom:6,textTransform:"uppercase",letterSpacing:".5px"}}>🏷️ Теги</div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                      {customLabels.map(l=>{
-                        const has=(venueLabels[String(sv.id)]||[]).includes(l.id);
-                        return(
-                          <button key={l.id}
-                            style={{padding:"4px 10px",borderRadius:12,border:`1.5px solid ${has?l.color:"var(--border)"}`,background:has?`${l.color}22`:"transparent",color:has?l.color:"var(--txt3)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito'",transition:"all .15s"}}
-                            onClick={()=>{
-                              const cur=venueLabels[String(sv.id)]||[];
-                              const updated={...venueLabels,[String(sv.id)]:has?cur.filter(x=>x!==l.id):[...cur,l.id]};
-                              setVenueLabels(updated);saveVenueLabels(updated);
-                            }}>
-                            {l.emoji} {l.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                {mm==="my"&&(
+                  <VenuePersonalTagsEditor
+                    venueId={sv.id}
+                    labels={customLabels}
+                    venueLabels={venueLabels}
+                    onToggle={toggleVenuePersonalLabel}
+                    onManage={()=>setShowLabelManager(true)}
+                  />
                 )}
                 {/* VENUE NOTE */}
                 <div style={{padding:"0 14px 10px"}}>
@@ -1497,7 +1517,7 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                   ):(
                     <>
-                      {isAdmin&&!sv.custom&&(
+                      {mm==="city"&&isAdmin&&!sv.custom&&(
                         <button
                           style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(232,168,56,.45)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:7}}
                           onClick={()=>openAdminVenueEditor(sv)}>
@@ -2022,6 +2042,41 @@ html,body,#root{height:100%;overflow:hidden}
     )}
 
   </>);}
+
+function VenuePersonalTagsEditor({ venueId, labels, venueLabels, onToggle, onManage }){
+  const selectedIds=venueLabels[String(venueId)]||[];
+
+  return(
+    <div style={{padding:"0 14px 10px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:6}}>
+        <div style={{fontSize:10,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:".5px"}}>🏷️ Мои теги</div>
+        <button onClick={onManage}
+          style={{padding:"3px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+          настроить
+        </button>
+      </div>
+      {labels.length>0?(
+        <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+          {labels.map(label=>{
+            const has=selectedIds.includes(label.id);
+            return(
+              <button key={label.id}
+                style={{padding:"4px 10px",borderRadius:12,border:`1.5px solid ${has?label.color:"var(--border)"}`,background:has?`${label.color}22`:"transparent",color:has?label.color:"var(--txt3)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito'",transition:"all .15s"}}
+                onClick={()=>onToggle(venueId,label.id)}>
+                {label.emoji} {label.name}
+              </button>
+            );
+          })}
+        </div>
+      ):(
+        <button onClick={onManage}
+          style={{width:"100%",padding:9,borderRadius:10,border:"1.5px dashed var(--border)",background:"transparent",color:"var(--txt3)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}>
+          + Создать личный тег
+        </button>
+      )}
+    </div>
+  );
+}
 
 function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
   const inputStyle={width:"100%",padding:"8px 10px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:8,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none"};
