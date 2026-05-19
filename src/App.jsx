@@ -13,11 +13,13 @@ import { checkinService } from './services/checkinService.js';
 import { favoriteService } from './services/favoriteService.js';
 import { menuPhotoService } from './services/menuPhotoService.js';
 import { profileService } from './services/profileService.js';
+import { venueCatalogService } from './services/venueCatalogService.js';
 import { venueDataService } from './services/venueDataService.js';
 import { venueSubmissionService } from './services/venueSubmissionService.js';
 import { wishlistService } from './services/wishlistService.js';
 
 const getInstagramUrl = (handle) => `https://www.instagram.com/${handle}`;
+const BASE_VENUE_CATEGORIES = CATEGORIES.filter((category) => category.k !== "all");
 
 export default function App(){
   return <ErrorBoundary><AuthWrapper/></ErrorBoundary>;
@@ -177,6 +179,8 @@ function FogEat({session}){
   const[showVisitModal,setShowVisitModal]=useState(false);
   const[visitNote,setVisitNote]=useState("");
   const[visitRating,setVisitRating]=useState(0);
+  const[adminEditVenue,setAdminEditVenue]=useState(null);
+  const[adminVenueSaving,setAdminVenueSaving]=useState(false);
   const[showAddVenue,setShowAddVenue]=useState(false);
   const[catalogVenues,setCatalogVenues]=useState(DEFAULT_VENUES);
   const[customVenues,setCustomVenues]=useState([]);
@@ -246,6 +250,40 @@ function FogEat({session}){
   const saveUser=async()=>{}; // XP/level are still in memory
 
   const saveCustomVenues=async(data)=>venueDataService.saveCustomVenues(uid,data);
+
+  const openAdminVenueEditor=(venue)=>{
+    if(!isAdmin||venue.custom)return;
+    setAdminEditVenue({
+      id:venue.id,
+      n:venue.n||"",
+      a:venue.a||"",
+      c:venue.c||"Ресторан",
+      s:venue.s||"",
+      i:venue.i||"📍",
+      r:String(venue.r||0),
+      ig:venue.ig||"",
+      lat:venue.lat,
+      lng:venue.lng,
+    });
+  };
+
+  const saveAdminVenue=async()=>{
+    if(!adminEditVenue?.n?.trim()){alert("Введи название заведения");return;}
+    if(!adminEditVenue?.c?.trim()){alert("Выбери категорию");return;}
+    setAdminVenueSaving(true);
+    try{
+      const updated=await venueCatalogService.updateCatalogVenue(adminEditVenue.id,adminEditVenue);
+      setCatalogVenues(venues=>venues.map(venue=>String(venue.id)===String(updated.id)?updated:venue));
+      setSv(current=>String(current?.id)===String(updated.id)?{...current,...updated,_confirmDelete:false}:current);
+      setAdminEditVenue(null);
+      alert("Заведение обновлено");
+    }catch(e){
+      console.error(e);
+      alert(`Не удалось сохранить заведение: ${e?.message || "неизвестная ошибка"}`);
+    }finally{
+      setAdminVenueSaving(false);
+    }
+  };
 
   useEffect(()=>{
     if(!sv)return;
@@ -857,8 +895,14 @@ html,body,#root{height:100%;overflow:hidden}
                     </div>
                   </div>
                 ):(
-                  <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
-                    onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>🗑 Удалить заведение</button>
+                  <>
+                    {isAdmin&&!sv.custom&&(
+                      <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(232,168,56,.45)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:7}}
+                        onClick={()=>openAdminVenueEditor(sv)}>✎ Редактировать заведение</button>
+                    )}
+                    <button style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                      onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>🗑 Удалить заведение</button>
+                  </>
                 )}
               </div>}
               {myci.length>0&&<>
@@ -1451,11 +1495,20 @@ html,body,#root{height:100%;overflow:hidden}
                       </div>
                     </div>
                   ):(
-                    <button
-                      style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
-                      onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>
-                      🗑 Удалить заведение
-                    </button>
+                    <>
+                      {isAdmin&&!sv.custom&&(
+                        <button
+                          style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(232,168,56,.45)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer",marginBottom:7}}
+                          onClick={()=>openAdminVenueEditor(sv)}>
+                          ✎ Редактировать заведение
+                        </button>
+                      )}
+                      <button
+                        style={{width:"100%",padding:9,borderRadius:10,border:"1.5px solid rgba(200,50,50,.4)",background:"rgba(200,50,50,.07)",color:"#c05050",fontFamily:"'Nunito'",fontWeight:800,fontSize:12,cursor:"pointer"}}
+                        onClick={()=>setSv(v=>({...v,_confirmDelete:true}))}>
+                        🗑 Удалить заведение
+                      </button>
+                    </>
                   )}
                 </div>}
                 {menuPhotos[sv.id]?.length>0&&<>
@@ -1765,6 +1818,16 @@ html,body,#root{height:100%;overflow:hidden}
       </div>
     )}
 
+    {adminEditVenue&&(
+      <AdminVenueEditorModal
+        venue={adminEditVenue}
+        saving={adminVenueSaving}
+        onChange={(patch)=>setAdminEditVenue(venue=>({...venue,...patch}))}
+        onSave={saveAdminVenue}
+        onClose={()=>setAdminEditVenue(null)}
+      />
+    )}
+
     {/* ADD VENUE MODAL */}
     {showAddVenue&&(
       <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}
@@ -1958,6 +2021,92 @@ html,body,#root{height:100%;overflow:hidden}
     )}
 
   </>);}
+
+function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
+  const inputStyle={width:"100%",padding:"8px 10px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:8,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none"};
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2200,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(6px)"}}
+      onClick={()=>!saving&&onClose()}>
+      <div style={{width:420,maxHeight:"88vh",background:"var(--bg2)",borderRadius:16,border:"1px solid var(--border)",display:"flex",flexDirection:"column",overflow:"hidden",color:"var(--txt)"}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 18px 0",textAlign:"center",flexShrink:0}}>
+          <div style={{fontFamily:"'Dela Gothic One'",fontSize:16,marginBottom:12}}>✎ Редактировать заведение</div>
+        </div>
+        <div style={{padding:"0 18px 18px",overflowY:"auto",flex:1}}>
+          {[
+            {k:"n",label:"Название *",ph:"Название заведения"},
+            {k:"a",label:"Адрес",ph:"ул. Коста, 10"},
+          ].map(field=>(
+            <div key={field.k} style={{marginBottom:8}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>{field.label}</div>
+              <input value={venue[field.k]} onChange={e=>onChange({[field.k]:e.target.value})}
+                placeholder={field.ph}
+                style={inputStyle}/>
+            </div>
+          ))}
+
+          <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:4}}>Категория *</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:12}}>
+            {BASE_VENUE_CATEGORIES.map(category=>(
+              <button key={category.k} onClick={()=>onChange({c:category.k})}
+                style={{padding:"4px 9px",borderRadius:12,border:`1.5px solid ${venue.c===category.k?"var(--grn2)":"var(--border)"}`,background:venue.c===category.k?"var(--grn)":"transparent",color:venue.c===category.k?"#fff":"var(--txt2)",fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                {category.l}
+              </button>
+            ))}
+          </div>
+
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Своя категория</div>
+            <input value={venue.c} onChange={e=>onChange({c:e.target.value})}
+              placeholder="Кофейня, винный бар, десерты..."
+              style={inputStyle}/>
+          </div>
+
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Теги / кухня</div>
+            <input value={venue.s} onChange={e=>onChange({s:e.target.value})}
+              placeholder="Осетинская, завтраки, панорама"
+              style={inputStyle}/>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"64px 1fr 86px",gap:8,marginBottom:8}}>
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Иконка</div>
+              <input value={venue.i} onChange={e=>onChange({i:e.target.value})}
+                style={{...inputStyle,textAlign:"center",fontSize:16,padding:"7px 8px"}}/>
+            </div>
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Instagram</div>
+              <input value={venue.ig} onChange={e=>onChange({ig:e.target.value})}
+                placeholder="bez @"
+                style={inputStyle}/>
+            </div>
+            <div>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)",marginBottom:3}}>Рейтинг</div>
+              <input value={venue.r} onChange={e=>onChange({r:e.target.value})}
+                inputMode="decimal"
+                style={inputStyle}/>
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:8,marginTop:12}}>
+            <button disabled={saving}
+              style={{flex:1,padding:11,borderRadius:10,border:"none",background:"linear-gradient(90deg,var(--gold),var(--gold2))",color:"var(--bg)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer",opacity:saving?0.5:1}}
+              onClick={onSave}>
+              {saving?"Сохраняем...":"✓ Сохранить"}
+            </button>
+            <button disabled={saving}
+              style={{flex:1,padding:11,borderRadius:10,border:"none",background:"var(--bg3)",color:"var(--txt2)",fontFamily:"'Nunito'",fontWeight:800,fontSize:13,cursor:"pointer",opacity:saving?0.5:1}}
+              onClick={onClose}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AdminPanel({ catalogVenues, adminUserId, onCatalogVenueCreated }){
   const[adminTab,setAdminTab]=useState("users");
