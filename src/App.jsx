@@ -6,7 +6,7 @@ import { ACHIEVEMENT_CHAINS, buildAchievementState } from './domain/achievements
 import { CATEGORIES, DEFAULT_VENUES, filterVenues, getVenueColor, sortVenues } from './domain/catalog.js';
 import { LIMITS, LIMIT_ERROR_CODES } from './domain/limits.js';
 import { INITIAL_USER } from './domain/user.js';
-import { VENUE_TAG_GROUPS, getSuggestedVenueTags, hasVenueTag, mergeVenueTags, parseVenueTags, toggleVenueTag } from './domain/venueTags.js';
+import { VENUE_TAG_GROUPS, hasVenueTag, mergeVenueTags, parseVenueTags, toggleVenueTag } from './domain/venueTags.js';
 import { adminService } from './services/adminService.js';
 import { appDataService } from './services/appDataService.js';
 import { authService } from './services/authService.js';
@@ -2079,9 +2079,26 @@ function VenuePersonalTagsEditor({ venueId, labels, venueLabels, onToggle, onMan
 }
 
 function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
+  const[customTagsByGroup,setCustomTagsByGroup]=useState({});
+  const[customTagGroup,setCustomTagGroup]=useState(null);
+  const[customTagValue,setCustomTagValue]=useState("");
   const inputStyle={width:"100%",padding:"8px 10px",background:"var(--bg3)",border:"1.5px solid var(--border)",borderRadius:8,color:"var(--txt)",fontFamily:"'Nunito'",fontSize:12,outline:"none"};
-  const suggestedTags=getSuggestedVenueTags(venue.c);
   const updateTags=(nextValue)=>onChange({s:nextValue});
+  const addCustomTag=()=>{
+    const tag=customTagValue.trim();
+    if(!tag)return;
+    if(customTagGroup){
+      setCustomTagsByGroup(prev=>{
+        const current=prev[customTagGroup]||[];
+        const preset=VENUE_TAG_GROUPS.find(group=>group.title===customTagGroup)?.tags||[];
+        if([...preset,...current].some(currentTag=>currentTag.toLowerCase()===tag.toLowerCase()))return prev;
+        return {...prev,[customTagGroup]:[...current,tag]};
+      });
+    }
+    updateTags(mergeVenueTags(venue.s,[tag]));
+    setCustomTagValue("");
+    setCustomTagGroup(null);
+  };
   const tagButtonStyle=(selected)=>({
     padding:"4px 9px",
     borderRadius:12,
@@ -2133,50 +2150,56 @@ function AdminVenueEditorModal({ venue, saving, onChange, onSave, onClose }){
           </div>
 
           <div style={{marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:6}}>
-              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)"}}>Теги / кухня</div>
-              <div style={{display:"flex",gap:5}}>
-                <button
-                  disabled={!suggestedTags.length}
-                  onClick={()=>updateTags(mergeVenueTags(venue.s,suggestedTags))}
-                  style={{padding:"3px 8px",borderRadius:7,border:"1px solid rgba(232,168,56,.35)",background:"rgba(232,168,56,.08)",color:"var(--gold)",fontSize:9,fontWeight:800,cursor:suggestedTags.length?"pointer":"default",fontFamily:"'Nunito'",opacity:suggestedTags.length?1:.45}}>
-                  заполнить
-                </button>
-                <button
-                  onClick={()=>updateTags("")}
-                  style={{padding:"3px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
-                  очистить
-                </button>
-              </div>
-            </div>
-
-            {suggestedTags.length>0&&(
-              <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-                {suggestedTags.map(tag=>(
-                  <button key={tag} onClick={()=>updateTags(toggleVenueTag(venue.s,tag))}
-                    style={tagButtonStyle(hasVenueTag(venue.s,tag))}>
-                    {hasVenueTag(venue.s,tag)?"✓ ":"+ "}{tag}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {VENUE_TAG_GROUPS.map(group=>(
               <div key={group.title} style={{marginBottom:7}}>
-                <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",marginBottom:4,textTransform:"uppercase"}}>{group.title}</div>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <div style={{fontSize:9,fontWeight:800,color:"var(--txt3)",textTransform:"uppercase"}}>{group.title}</div>
+                  <button
+                    onClick={()=>{setCustomTagGroup(group.title);setCustomTagValue("");}}
+                    style={{width:18,height:18,borderRadius:"50%",border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--gold)",fontSize:13,lineHeight:"16px",fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Nunito'"}}>
+                    +
+                  </button>
+                </div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {group.tags.map(tag=>(
+                  {[...group.tags,...(customTagsByGroup[group.title]||[])].map(tag=>(
                     <button key={tag} onClick={()=>updateTags(toggleVenueTag(venue.s,tag))}
                       style={tagButtonStyle(hasVenueTag(venue.s,tag))}>
                       {tag}
                     </button>
                   ))}
                 </div>
+                {customTagGroup===group.title&&(
+                  <div style={{display:"flex",gap:5,marginTop:6}}>
+                    <input
+                      autoFocus
+                      value={customTagValue}
+                      onChange={e=>setCustomTagValue(e.target.value)}
+                      onKeyDown={e=>{
+                        if(e.key==="Enter")addCustomTag();
+                        if(e.key==="Escape"){setCustomTagGroup(null);setCustomTagValue("");}
+                      }}
+                      placeholder={`Добавить в ${group.title.toLowerCase()}`}
+                      style={{...inputStyle,padding:"6px 9px",fontSize:11}}/>
+                    <button
+                      onClick={addCustomTag}
+                      style={{width:34,borderRadius:8,border:"none",background:"var(--gold)",color:"var(--bg)",fontSize:16,fontWeight:900,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,margin:"10px 0 3px"}}>
+              <div style={{fontSize:10,fontWeight:800,color:"var(--txt2)"}}>Итоговые теги</div>
+              <button
+                onClick={()=>updateTags("")}
+                style={{padding:"3px 8px",borderRadius:7,border:"1px solid var(--border)",background:"var(--bg3)",color:"var(--txt3)",fontSize:9,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito'"}}>
+                очистить
+              </button>
+            </div>
             <input value={venue.s} onChange={e=>onChange({s:e.target.value})}
-              placeholder="Можно поправить вручную: осетинская, завтраки, вид"
+              placeholder="Можно поправить вручную: осетинская, завтраки"
               style={inputStyle}/>
           </div>
 

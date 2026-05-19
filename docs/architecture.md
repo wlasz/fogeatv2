@@ -30,7 +30,7 @@ Fallback public values are still present so the existing Vercel deploy keeps wor
 The base venue catalog is loaded through `src/services/venueCatalogService.js`.
 In production it reads from `public.venues`, which makes names, addresses, Instagram handles, ratings, coordinates, icons, and dish metadata editable in Supabase.
 Admins can also edit core venue fields from the app itself; those updates go through `venueCatalogService.updateCatalogVenue` and persist to `public.venues`.
-Admin tag suggestions for the venue editor live in `src/domain/venueTags.js`; they currently write back into the existing `venues.subcategory` text field.
+Admin public tag controls for the venue editor live in `src/domain/venueTags.js`; they currently write back into the existing `venues.subcategory` text field.
 City-mode venue tags are public catalog data and are editable only through the admin venue editor. My-mode venue tags are per-user labels stored in `venue_labels` and `venue_label_assignments`.
 
 `src/domain/catalog.js` still contains `DEFAULT_VENUES` as a local fallback. If the `venues` table is missing, empty, or temporarily unavailable, the app keeps working with that bundled catalog.
