@@ -157,6 +157,8 @@ function FogEat({session}){
   const[checkins,setCheckins]=useState([]);
   const[wishVenues,setWishVenues]=useState([]);
   const[wishDishes,setWishDishes]=useState([]);
+  const[expandedWishVenueId,setExpandedWishVenueId]=useState(null);
+  const[wishDishDraft,setWishDishDraft]=useState("");
   const[user,setUser]=useState(INITIAL_USER);
 
   const[dishNote,setDishNote]=useState("");
@@ -512,6 +514,7 @@ function FogEat({session}){
   const removeWishVenue=(id)=>{
     const updated=wishVenues.filter(w=>w.id!==id);
     setWishVenues(updated);saveWishVenues(updated);
+    if(String(expandedWishVenueId)===String(id)){setExpandedWishVenueId(null);setWishDishDraft("");}
   };
 
   const hasWishDish=(venue,dish)=>wishDishes.some(w=>String(w.venueId)===String(venue.id)&&String(w.dishId)===String(dish.id));
@@ -537,6 +540,24 @@ function FogEat({session}){
   const removeWishDish=(dish)=>{
     const updated=wishDishes.filter(w=>!(String(w.venueId)===String(dish.venueId)&&String(w.dishId)===String(dish.dishId)));
     setWishDishes(updated);saveWishDishes(updated);
+  };
+
+  const addCustomWishDish=(venue)=>{
+    const dishName=wishDishDraft.trim();
+    if(!dishName)return;
+    const exists=wishDishes.some(dish=>String(dish.venueId)===String(venue.id)&&dish.d.trim().toLowerCase()===dishName.toLowerCase());
+    if(exists){setWishDishDraft("");return;}
+    const dishId=-Math.max(1,Math.floor((Date.now()+Math.floor(Math.random()*1000))%2000000000));
+    const updated=[{
+      venueId:venue.id,
+      dishId,
+      v:venue.n,
+      d:dishName,
+      e:"🍽️",
+      tag:"хочу попробовать",
+    },...wishDishes];
+    setWishDishes(updated);saveWishDishes(updated);
+    setWishDishDraft("");
   };
 
   const deleteUserCheckin=async(checkin)=>{
@@ -729,10 +750,21 @@ html,body,#root{height:100%;overflow:hidden}
 .wl-tab{flex:1;padding:8px;text-align:center;font-weight:800;font-size:10px;color:var(--txt3);border:none;background:none;cursor:pointer;font-family:'Nunito';border-bottom:2px solid transparent;transition:all .2s}
 .wl-tab.a{color:var(--gold);border-color:var(--gold)}
 .wi{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--border)}
+.wi.clickable{cursor:pointer}
+.wi-open{border-bottom:1px solid var(--border)}
+.wi-open .wi{border-bottom:none}
 .wic{width:32px;height:32px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:17px;border:1px solid var(--border)}
 .wif{flex:1;min-width:0}.win{font-weight:800;font-size:12px}.wint{font-size:9px;color:var(--txt3);margin-top:1px}
 .wr{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:none;color:var(--txt3);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
 .wr:hover{background:rgba(255,80,80,.15);color:#ff5050;border-color:#ff5050}
+.wish-dish-add{display:flex;gap:6px;padding:0 12px 10px 53px}
+.wish-dish-add input{flex:1;min-width:0;padding:7px 9px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg3);color:var(--txt);font-family:'Nunito';font-size:11px;outline:none}
+.wish-dish-add input:focus{border-color:var(--gold)}
+.wish-dish-add button{padding:7px 10px;border-radius:8px;border:none;background:var(--gold);color:var(--bg);font-family:'Nunito';font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.wish-dish-add button:disabled{opacity:.45;cursor:default}
+.wish-dish-list{padding:0 12px 10px 53px;display:flex;flex-direction:column;gap:5px}
+.wish-dish-pill{display:flex;align-items:center;gap:6px;color:var(--txt2);font-size:10px}
+.wish-dish-pill button{width:17px;height:17px;border-radius:50%;border:1px solid var(--border);background:none;color:var(--txt3);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
 /* MY CHECKINS TAB */
 .ck{padding:10px 12px;border-bottom:1px solid var(--border)}
@@ -1054,9 +1086,23 @@ html,body,#root{height:100%;overflow:hidden}
               <div style={{display:"flex",flexDirection:"column",overflow:"hidden",flex:1}}>
                 <div className="wl-tabs">{["venues","dishes","done"].map(k=><button key={k} className={`wl-tab ${wt===k?"a":""}`} onClick={()=>setWt(k)}>{k==="venues"?"📍 Места":k==="dishes"?"🍽️ Блюда":"✅ Готово"}</button>)}</div>
                 <div className="sc">
-                  {wt==="venues"&&(wishVenues.length===0?<div className="empty"><div className="empty-ico">📌</div><div className="empty-txt">Нет мест</div></div>:wishVenues.map((w,i)=>(
-                    <div key={i} className="wi"><div className="wic">{w.c}</div><div className="wif"><div className="win">{w.n}</div></div><button className="wr" onClick={()=>removeWishVenue(w.id)}>×</button></div>
-                  )))}
+                  {wt==="venues"&&(wishVenues.length===0?<div className="empty"><div className="empty-ico">📌</div><div className="empty-txt">Нет мест</div></div>:wishVenues.map(w=>{
+                    const open=String(expandedWishVenueId)===String(w.id);
+                    return(
+                      <WishlistVenueItem
+                        key={w.id}
+                        venue={w}
+                        open={open}
+                        draft={open?wishDishDraft:""}
+                        venueDishes={wishDishes.filter(dish=>String(dish.venueId)===String(w.id))}
+                        onToggle={()=>{setExpandedWishVenueId(open?null:w.id);setWishDishDraft("");}}
+                        onDraftChange={setWishDishDraft}
+                        onAddDish={()=>addCustomWishDish(w)}
+                        onRemoveVenue={()=>removeWishVenue(w.id)}
+                        onRemoveDish={removeWishDish}
+                      />
+                    );
+                  }))}
                   {wt==="dishes"&&(wishDishes.length===0?<div className="empty"><div className="empty-ico">🍽️</div><div className="empty-txt">Нет блюд</div></div>:wishDishes.map((w,i)=>(
                     <div key={`${w.venueId}-${w.dishId}-${i}`} className="wi"><div className="wic">{w.e}</div><div className="wif"><div className="win">{w.d}</div><div className="wint">{w.v}{w.tag?` · ${w.tag}`:""}</div></div><button className="wr" onClick={()=>removeWishDish(w)}>×</button></div>
                   )))}
@@ -1274,13 +1320,23 @@ html,body,#root{height:100%;overflow:hidden}
               <div className="sc">
                 {wt==="venues"&&(wishVenues.length===0?(
                   <div className="empty"><div className="empty-ico">📌</div><div className="empty-txt">Нет сохранённых мест</div></div>
-                ):wishVenues.map((w,i)=>(
-                  <div key={i} className="wi">
-                    <div className="wic">{w.c}</div>
-                    <div className="wif"><div className="win">{w.n}</div>{w.no&&<div className="wint">{w.no}</div>}</div>
-                    <button className="wr" onClick={()=>removeWishVenue(w.id)}>×</button>
-                  </div>
-                )))}
+                ):wishVenues.map(w=>{
+                  const open=String(expandedWishVenueId)===String(w.id);
+                  return(
+                    <WishlistVenueItem
+                      key={w.id}
+                      venue={w}
+                      open={open}
+                      draft={open?wishDishDraft:""}
+                      venueDishes={wishDishes.filter(dish=>String(dish.venueId)===String(w.id))}
+                      onToggle={()=>{setExpandedWishVenueId(open?null:w.id);setWishDishDraft("");}}
+                      onDraftChange={setWishDishDraft}
+                      onAddDish={()=>addCustomWishDish(w)}
+                      onRemoveVenue={()=>removeWishVenue(w.id)}
+                      onRemoveDish={removeWishDish}
+                    />
+                  );
+                }))}
                 {wt==="dishes"&&(wishDishes.length===0?(
                   <div className="empty"><div className="empty-ico">🍽️</div><div className="empty-txt">Нет сохранённых блюд</div></div>
                 ):wishDishes.map((w,i)=>(
@@ -2042,6 +2098,46 @@ html,body,#root{height:100%;overflow:hidden}
     )}
 
   </>);}
+
+function WishlistVenueItem({ venue, open, draft, venueDishes, onToggle, onDraftChange, onAddDish, onRemoveVenue, onRemoveDish }){
+  return(
+    <div className={open?"wi-open":""}>
+      <div className="wi clickable" onClick={onToggle}>
+        <div className="wic">{venue.c}</div>
+        <div className="wif">
+          <div className="win">{venue.n}</div>
+          {venue.no&&<div className="wint">{venue.no}</div>}
+        </div>
+        <button className="wr" onClick={e=>{e.stopPropagation();onRemoveVenue();}}>×</button>
+      </div>
+      {open&&(
+        <>
+          <div className="wish-dish-add">
+            <input
+              value={draft}
+              onChange={e=>onDraftChange(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")onAddDish();}}
+              placeholder="Добавить блюдо, которое хочу попробовать"
+              autoFocus
+            />
+            <button disabled={!draft.trim()} onClick={onAddDish}>Добавить</button>
+          </div>
+          {venueDishes.length>0&&(
+            <div className="wish-dish-list">
+              {venueDishes.map(dish=>(
+                <div key={`${dish.venueId}-${dish.dishId}`} className="wish-dish-pill">
+                  <span>{dish.e || "🍽️"}</span>
+                  <span>{dish.d}</span>
+                  <button onClick={()=>onRemoveDish(dish)}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 function VenuePersonalTagsEditor({ venueId, labels, venueLabels, onToggle, onManage }){
   const selectedIds=venueLabels[String(venueId)]||[];
