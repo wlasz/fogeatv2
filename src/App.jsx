@@ -561,11 +561,20 @@ function FogEat({session}){
   };
 
   const deleteUserCheckin=async(checkin)=>{
-    await checkinService.deleteCheckin(checkin.id,checkin.photoKey);
-    const updated=checkins.filter(ch=>ch.id!==checkin.id);
+    const prevCheckins=checkins;
+    const prevPhoto=checkinPhotos[checkin.id];
+    const updated=checkins.filter(ch=>String(ch.id)!==String(checkin.id));
     setCheckins(updated);
     setCheckinPhotos(p=>{const n={...p};delete n[checkin.id];return n;});
     setConfirmDeleteCheckin(null);
+    try{
+      await checkinService.deleteCheckin(checkin.id,checkin.photoKey);
+    }catch(error){
+      setCheckins(prevCheckins);
+      if(prevPhoto)setCheckinPhotos(p=>({...p,[checkin.id]:prevPhoto}));
+      const message=error?.message==="No checkin rows were deleted"?"в Supabase нужно применить миграцию на удаление чек-инов":(error?.message||"попробуй ещё раз");
+      alert(`Не удалось удалить чек-ин: ${message}`);
+    }
   };
 
   const removeMenuPhoto=async(venueId,index)=>{

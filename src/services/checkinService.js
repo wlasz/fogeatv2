@@ -62,7 +62,13 @@ export const checkinService = {
       } catch {}
     }
 
-    return supabase.from('checkins').delete().eq('id', parseInt(checkinId))
+    const { error, count } = await supabase
+      .from('checkins')
+      .delete({ count: 'exact' })
+      .eq('id', checkinId)
+    if (error) throw error
+    if (count === 0) throw new Error('No checkin rows were deleted')
+    return { error: null, count }
   },
 
   async uploadCheckinPhoto({ venueId, checkinId, photoDataUrl }) {
